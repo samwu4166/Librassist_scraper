@@ -65,11 +65,16 @@ function ntpu(books,page,list_max)
 					if(data_title!=""){
 						json.title = data_title;
 						json.author = data_author;
-						console.log(json);
+						//console.log(json);
 					}
-			
-					
 			})
+			var Allpage = $(".list_info").find("p").text().trim();
+			Allpage = Allpage.split("/")[0];
+			Allpage = Allpage.replace(/ /,"");
+			Allpage = Allpage.split(",")[1];
+			Allpage = Allpage.replace("共 ","");
+			Allpage = Allpage.replace(" 筆","");
+			console.log("All Page : "+Allpage);
 		}
 		else
 		{
@@ -97,9 +102,8 @@ function test_cloud_prepared(keyvalue)
 			        k0:keyvalue,
 			        t0:"k",
 			        c0:"and",
-			        list_num:"20",
+			        list_num:"10",
 			        current_page:"1",
-			        si:"6"
 			    },
 			    headers: {
 			        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
@@ -128,6 +132,13 @@ function test_cloud_prepared(keyvalue)
 								
 							}
 					})
+					var Allpage = $(".list_info").find("p").text().trim();
+					Allpage = Allpage.split("/")[0];
+					Allpage = Allpage.replace(/ /,"");
+					Allpage = Allpage.split(",")[1];
+					Allpage = Allpage.replace("共 ","");
+					Allpage = Allpage.replace(" 筆","");
+					console.log("All Page :"+Allpage+".");
 				
 			})
 			.then(function(){
@@ -149,7 +160,7 @@ function test_cloud_prepared(keyvalue)
 		  // successMessage 是任何您由上方 resolve(...) 傳入的東西。
 		  // 在此僅作為成功訊息，但是它不一定是字串。
 		  for(i=0;i<links.length;i++){
-		  		//console.log("scraping.. : "+links[2]);
+		  		//
 					var options = {
 					    uri: links[i],	
 						headers: {
@@ -179,7 +190,7 @@ function test_cloud_prepared(keyvalue)
 							publisher = publisher.replace('出版社 :','')
 
 							var publish_year = $(".info").find("p").html().split("<br>")[2].trim();
-							publish_year = publish_year.replace("出版年 : ",'');
+							publish_year = publish_year.replace("出版年 :",'');
 
 							var ISBN_tag = false;
 							var ISBN = $(".info_box").find("p").html().split("<br>");
@@ -218,3 +229,5 @@ function test_cloud_prepared(keyvalue)
 }
 
 test_cloud_prepared("python");
+
+//ntpu("c++","1","10");
