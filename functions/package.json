@@ -1,0 +1,19 @@
+{
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "dependencies": {
+    "chai": "latest",
+    "chai-as-promised": "latest",
+    "cheerio": "latest",
+    "firebase-admin": "latest",
+    "firebase-functions": "latest",
+    "mocha": "latest",
+    "phantom": "latest",
+    "request": "latest",
+    "request-promise": "^4.2.2",
+    "sinon": "latest"
+  },
+  "scripts": {
+    "test": "./node_modules/.bin/mocha --reporter spec"
+  }
+}
