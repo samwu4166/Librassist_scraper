@@ -13,12 +13,20 @@ var config = {
     storageBucket: "librarytest-16eb2.appspot.com",
     messagingSenderId: "923330716692"
   };
- firebase.initializeApp(config);
-/*
+  var config2 = {
+  	apiKey: "AIzaSyDKpeNxuQZhPWP6AQd9uphsi775aIfhirU",
+    authDomain: "librassist-ea4a3.firebaseapp.com",
+    databaseURL: "https://librassist-ea4a3.firebaseio.com",
+    projectId: "librassist-ea4a3",
+    storageBucket: "librassist-ea4a3.appspot.com",
+    messagingSenderId: "720700750764"
+  }
+ firebase.initializeApp(config2);
+
 var db = firebase.database();
-var ref = db.ref("/");
-ref.update({"nickname":"Handsome"});
-*/
+
+//ref.update({"nickname":"Handsome"});
+
 
 function Xinpei(book_name){
 	var url = "http://webpac.tphcc.gov.tw/toread/opac/search?";
@@ -56,18 +64,8 @@ function ntpu(books,page,list_max)
 			var title;
 			var	author;
 			console.log('statusCode:', resp && resp.statusCode);
-			var json = {title:"",author:""};
-			$(".list_box").filter(function(){
-					var data_title = $(this).children().find("li>a").text().trim();
-					var data_author = $(this).children().find(".product_info_content>p").first().text().trim();
-					data_author = data_author.replace("作者:","");
+			var json = {title:"",author:"",link:""};
 
-					if(data_title!=""){
-						json.title = data_title;
-						json.author = data_author;
-						//console.log(json);
-					}
-			})
 			var Allpage = $(".list_info").find("p").text().trim();
 			Allpage = Allpage.split("/")[0];
 			Allpage = Allpage.replace(/ /,"");
@@ -75,6 +73,78 @@ function ntpu(books,page,list_max)
 			Allpage = Allpage.replace("共 ","");
 			Allpage = Allpage.replace(" 筆","");
 			console.log("All Page : "+Allpage);
+
+			$(".list_box").filter(function(){
+					var data_title = $(this).children().find("li>a").text().trim();
+					var data_author = $(this).children().find(".product_info_content>p").first().text().trim();
+					var data_link = $(this).children().find("li>a").attr("href");
+
+					data_author = data_author.replace("作者:","");
+
+					if(data_title!=""){
+						json.title = data_title;
+						json.author = data_author;
+						json.link = "http://webpac.lib.ntpu.edu.tw/"+data_link;
+						console.log(json);
+						ref.push(json);
+					}
+			})
+			
+		}
+		else
+		{
+			console.log("html failed!");
+		}
+		//console.log(html);
+	});
+	//db.ref('/').update({isFinish:"True"});
+}
+function test_for_sync_scrape()
+{
+	request("http://webpac.lib.ntpu.edu.tw/content.cfm?mid=279226&m=ss&k0=python&t0=k&c0=and&list_num=10&current_page=1&mt=&at=&sj=&py=&it=&lr=&lg=&si=6",function(err,resp,html){    //get 用qs來傳送參數
+		if(html!=""){
+			console.log("html load success\n");
+			var $ = cheerio.load(html,{decodeEntities: false});
+			var title;
+			var	author;
+			console.log('statusCode:', resp && resp.statusCode);
+			
+			var title = $(".info").first().find("h2").text().trim();
+
+							var author = $(".info").find("p").html().split("<br>")[0].trim();
+							author = author.replace('作者 :','');
+
+							var publisher = $(".info").find("p").html().split("<br>")[1].trim();
+							publisher = publisher.replace('出版社 :','')
+
+							var publish_year = $(".info").find("p").html().split("<br>")[2].trim();
+							publish_year = publish_year.replace("出版年 :",'');
+
+							var ISBN_tag = false;
+							var ISBN = $(".info_box").find("p").html().split("<br>");
+							for(var key in ISBN)
+							{
+								var text = ISBN[key].trim();
+								if(!text.search("ISBN") && ISBN_tag==false)
+								{
+									var first_ISBN = text.replace("ISBN ： ","");
+									first_ISBN = first_ISBN.split(" ",1);
+									//console.log(first_ISBN[0]);
+									//console.log(first_ISBN);
+									ISBN_tag=true;
+									break;
+								}
+							}
+
+							var Bookjson = {
+								"標題":title,
+								"作者":author,
+								"出版社":publisher,
+								"出版年份":publish_year,
+								"ISBN":first_ISBN[0]
+							};
+							
+							console.log(Bookjson);
 		}
 		else
 		{
@@ -85,11 +155,11 @@ function ntpu(books,page,list_max)
 }
 
 
-
-function test_cloud_prepared(keyvalue)
+function test_cloud_prepared(keyvalue,page)
 {
 
 		var links=[];
+		var Allpage;
 		let myPromise = new Promise((resolve, reject) => {
 		  // 當非同步作業成功時，呼叫 resolve(...),而失敗時則呼叫 reject(...)。
 		  // 在這個例子中，使用 setTimeout(...) 來模擬非同步程式碼。
@@ -102,8 +172,8 @@ function test_cloud_prepared(keyvalue)
 			        k0:keyvalue,
 			        t0:"k",
 			        c0:"and",
-			        list_num:"10",
-			        current_page:"1",
+			        list_num:"20",
+			        current_page:page,
 			    },
 			    headers: {
 			        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
@@ -129,10 +199,9 @@ function test_cloud_prepared(keyvalue)
 							if(data_title!=""){
 								var getlink = "http://webpac.lib.ntpu.edu.tw/"+link;
 								links.push(getlink);
-								
 							}
 					})
-					var Allpage = $(".list_info").find("p").text().trim();
+					Allpage = $(".list_info").find("p").text().trim();
 					Allpage = Allpage.split("/")[0];
 					Allpage = Allpage.replace(/ /,"");
 					Allpage = Allpage.split(",")[1];
@@ -154,6 +223,19 @@ function test_cloud_prepared(keyvalue)
 		function sleep(ms) {
   			return new Promise(resolve => setTimeout(resolve, ms));
 		}
+		function call_back(){
+			
+			if((parseInt(Allpage)-parseInt(page)*20)>0 && parseInt(page)<20 ){
+				
+				sleep(2000);
+				test_cloud_prepared(keyvalue,(parseInt(page)+1).toString());
+				console.log("scrape ",keyvalue," ",page);
+				//console.log(keyvalue," ",(parseInt(page)+1).toString());
+			}
+			//console.log("function returns");
+			return;
+			
+		}
 		myPromise.then((msg) => {
 			var i;
 			console.log("load uris "+msg);
@@ -161,6 +243,7 @@ function test_cloud_prepared(keyvalue)
 		  // 在此僅作為成功訊息，但是它不一定是字串。
 		  for(i=0;i<links.length;i++){
 		  		//
+		  			var mylink = links[i];
 					var options = {
 					    uri: links[i],	
 						headers: {
@@ -194,6 +277,10 @@ function test_cloud_prepared(keyvalue)
 
 							var ISBN_tag = false;
 							var ISBN = $(".info_box").find("p").html().split("<br>");
+
+
+							var img = $(".photo").find("img").attr("src");
+
 							for(var key in ISBN)
 							{
 								var text = ISBN[key].trim();
@@ -207,14 +294,17 @@ function test_cloud_prepared(keyvalue)
 							}
 
 							var Bookjson = {
+								"location":"ntpu",
 								"title":title,
 								"author":author,
 								"publisher":publisher,
 								"publish_year":publish_year,
-								"ISBN":first_ISBN
+								"ISBN":first_ISBN,
+								"link":mylink,
+								"image":img
 							};
 							
-							console.log(Bookjson);
+							db.ref('/library_books/'+keyvalue+'/').push(Bookjson);
 						
 					})
 					.then(function(){
@@ -225,9 +315,93 @@ function test_cloud_prepared(keyvalue)
 					});
 				//down	
 				}
-		});
+				return call_back();
+		})
+		.catch(function(err){
+			console.log(err);
+		})
+		return console.log("end of scrape");
 }
+function test(){
 
-test_cloud_prepared("python");
+    var links=[];
 
-//ntpu("c++","1","10");
+	var options = {
+			    uri: 'http://webpac.lib.ntpu.edu.tw/search.cfm?',
+			    qs: {
+			        m:"ss",
+			        k0:"python",
+			        t0:"k",
+			        c0:"and",
+			        list_num:"20",
+			        current_page:"1",
+			    },
+			    headers: {
+			        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
+					"Accept-Language":"en-US,en;q=0.9",
+					"Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+					"Connection":"keep-alive"
+			    },
+			    json: true, // Automatically parses the JSON string in the response
+				transform: function(body){
+					return cheerio.load(body);
+				}
+			};
+			rp(options)
+			.then(function($){
+					var title;
+					var	author;
+
+					var json = {title:"",author:"",link:"",isFinish:"false"};
+					$(".list_box").filter(function(){
+							var data_title = $(this).children().find("li>a").text().trim();
+							var data_author = $(this).children().find(".product_info_content>p").first().text().trim();
+							var link = $(this).children().find("li>a").attr("href");
+							var image = $(this).find(".product_img>img").attr("src");	
+							data_author = data_author.replace("作者:","");
+
+							if(data_title!=""){
+								var getlink = "http://webpac.lib.ntpu.edu.tw/"+link;
+								json.title = data_title;
+								json.author = data_author;
+								json.link = getlink;
+								json.img = image;
+								console.log(json);
+								//db.ref('/search_test/search_result').push(json);
+							}
+					})
+					
+					
+					var Allpage = $(".list_info").find("p").text().trim();
+					Allpage = Allpage.split("/")[0];
+					Allpage = Allpage.replace(/ /,"");
+					Allpage = Allpage.split(",")[1];
+					Allpage = Allpage.replace("共 ","");
+					Allpage = Allpage.replace(" 筆","");
+
+					//console.log("All Page : "+Allpage);	
+					
+			})
+			.then(function(){
+				 //db.ref('/isFinish').set("True");
+			})
+			.catch(function(err){
+				console.log(err);
+			});
+		
+      // You must return a Promise when performing asynchronous tasks inside a Functions such as
+      // writing to the Firebase Realtime Database.
+      // Setting an "uppercase" sibling in the Realtime Database returns a Promise.
+      //db.ref('/isFinish').set("pending");
+}
+function sleep(ms) {
+  			return new Promise(resolve => setTimeout(resolve, ms));
+		}
+//test_cloud_prepared("財務管理","1");
+//sleep(1500);
+//test_cloud_prepared("python","1");
+
+//console.log(parseInt("24"));
+//ntpu("c++","1","20");
+//test();
+test_for_sync_scrape();
