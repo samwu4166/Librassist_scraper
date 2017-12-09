@@ -101,7 +101,7 @@ function ntpu(books,page,list_max)
 }
 function test_for_sync_scrape()
 {
-	request("http://webpac.lib.ntpu.edu.tw/content.cfm?mid=279226&m=ss&k0=python&t0=k&c0=and&list_num=10&current_page=1&mt=&at=&sj=&py=&it=&lr=&lg=&si=6",function(err,resp,html){    //get 用qs來傳送參數
+	request("http://webpac.lib.ntpu.edu.tw/content.cfm?mid=153578&m=ss&k0=java&t0=k&c0=and&list_num=40&current_page=1&mt=&at=&sj=&py=&it=&lr=&lg=&si=6",function(err,resp,html){    //get 用qs來傳送參數
 		if(html!=""){
 			console.log("html load success\n");
 			var $ = cheerio.load(html,{decodeEntities: false});
@@ -128,8 +128,9 @@ function test_for_sync_scrape()
 								if(!text.search("ISBN") && ISBN_tag==false)
 								{
 									var first_ISBN = text.replace("ISBN ： ","");
+									
 									first_ISBN = first_ISBN.split(" ",1);
-									//console.log(first_ISBN[0]);
+									
 									//console.log(first_ISBN);
 									ISBN_tag=true;
 									break;
