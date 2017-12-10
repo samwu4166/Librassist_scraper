@@ -28,7 +28,7 @@ const admin = require('firebase-admin');
 admin.initializeApp(functions.config().firebase);
 // [END import]
 
-exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/temp_result/{pushId}/link')
+exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/temp_result_ntpu/{pushId}/link')
     .onCreate(event => {
    
 	const searchUrl = event.data.val();
@@ -122,7 +122,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/te
 				return event.data.ref.parent.remove();
 			})
 			.catch(function(err){
-				console.log(err);
+				console.log("search ",searchUrl," wrond!");
 			})
       // [END searchkeyBody]
     });
@@ -179,19 +179,10 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/key
 									json.author = data_author;
 									json.link = getlink;
 									json.img = image;
-									event.data.ref.parent.child('temp_result').push(json);
+									event.data.ref.parent.child('temp_result_ntpu').push(json);
 								}
 						})
 
-						var Allpage = $(".list_info").find("p").text().trim();
-						Allpage = Allpage.split("/")[0];
-						Allpage = Allpage.replace(/ /,"");
-						Allpage = Allpage.split(",")[1];
-						Allpage = Allpage.replace("共 ","");
-						Allpage = Allpage.replace(" 筆","");
-
-						console.log("All Page : "+Allpage);	
-						return event.data.ref.parent.child('Allpage').set(Allpage);
 				})
 				.catch(function(err){
 					console.log(err);
@@ -204,7 +195,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/key
     	});
     });
 
-exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/temp_result/{pushId}/refresh')
+exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/temp_result_ntpu/{pushId}/refresh')
 	.onUpdate(event => {
 
 			return event.data.ref.parent.child('link').once('value')
@@ -299,3 +290,61 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/temp_r
 			})
 		})
 	});
+
+
+exports.sinpei_search_url = functions.database.ref('/user_data/{userId}/search/key')
+    .onCreate(event => {
+
+    	const uid = event.params.userId;
+    	console.log("(sinpei)uid is "+uid);
+    	const root = event.data.ref.root;
+    	
+    	const key = event.data.val();
+    		
+    	var options = {
+			    uri: 'http://webpac.tphcc.gov.tw/toread/opac/search?',
+			    qs: {
+			        q:key,
+			        max:"2",
+			        view:"CONTENT",
+			        location:"0",
+			    },
+			    headers: {
+			        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
+					"Accept-Language":"en-US,en;q=0.9",
+					"Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+					"Connection":"keep-alive"
+			    },
+			    json: true, // Automatically parses the JSON string in the response
+				transform: function(body){
+					return cheerio.load(body,{decodeEntities: false});
+					}
+				};
+ 				const searchrp = rp(options)
+				.then(function($){
+					var title;
+					var	author;
+
+					var json = {title:"",author:""};
+					$(".data_reslt").filter(function(){
+							var data_title = $(this).find(".reslt_item_head").text().trim();
+							var data_author = $(this).find(".crs_author").text().trim();
+							var links = $(this).find(".reslt_item_head>a").attr("href");
+
+							data_title = data_title.replace("/","");
+							json.title = data_title;
+							json.author = data_author;
+							json.link = "http://webpac.tphcc.gov.tw"+links;
+							
+							event.data.ref.parent.child('temp_result_sinpei').push(json);
+						})
+				})
+				.catch(function(err){
+					console.log(err);
+				});
+			return Promise.all([searchrp]).then(()=>{
+					console.log("(sinpei)Scrape "+key+" success");
+					return event.data.ref.parent.child('SinpeisFinish').set("true");
+			})
+    	
+    });

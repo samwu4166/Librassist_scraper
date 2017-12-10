@@ -5,6 +5,7 @@ var rp = require("request-promise");
 var rp2 = require("request-promise");
 // The Cloud Functions for Firebase SDK to create Cloud Functions and setup triggers.
 // The Firebase Admin SDK to access the Firebase Realtime Database. 
+
 var config = {
     apiKey: "AIzaSyDzHx_01EmnGkXsHmQKDMh4rA9GYCJzdkk",
     authDomain: "librarytest-16eb2.firebaseapp.com",
@@ -28,13 +29,31 @@ var db = firebase.database();
 //ref.update({"nickname":"Handsome"});
 
 
-function Xinpei(book_name){
-	var url = "http://webpac.tphcc.gov.tw/toread/opac/search?";
+function Xinpei(){
 
-	var form = { q:book_name,max:"0",view:"CONTENT",location:"0"};
 
-	request({url:url,qs:form},function(err,resp,html){    //get 用qs來傳送參數
-		var $ = cheerio.load(html);
+
+	var options = {
+			    uri: 'http://webpac.tphcc.gov.tw/toread/opac/search?',
+			    qs: {
+			        q:"python",
+			        max:"0",
+			        view:"CONTENT",
+			        location:"0",
+			    },
+			    headers: {
+			        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
+					"Accept-Language":"en-US,en;q=0.9",
+					"Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+					"Connection":"keep-alive"
+			    },
+			    json: true, // Automatically parses the JSON string in the response
+				transform: function(body){
+					return cheerio.load(body,{decodeEntities: false});
+				}
+			};
+	const pr = rp(options)
+	.then(function($){
 		var title;
 		var	author;
 
@@ -42,63 +61,25 @@ function Xinpei(book_name){
 		$(".data_reslt").filter(function(){
 				var data_title = $(this).find(".reslt_item_head").text().trim();
 				var data_author = $(this).find(".crs_author").text().trim();
+				var links = $(this).find(".reslt_item_head>a").attr("href");
+
 				data_title = data_title.replace("/","");
 				json.title = data_title;
 				json.author = data_author;
-			
+				json.link = "http://webpac.tphcc.gov.tw"+links;
 				console.log(json);
+				
 		})
-		console.log("Create success");
-	});
+	})
+	.catch(reason =>{
+		console.log(reason);
+	})
+	return Promise.all([pr]).then(()=>{
+		console.log("finish!");
+	})
+	
 }
-function ntpu(books,page,list_max)
-{
-	var url = "http://webpac.lib.ntpu.edu.tw/search.cfm?";
-
-	var form = { m:"ss",k0:books,t0:"k",c0:"and",list_num:list_max,current_page:page,si:"6"};
-
-	request({url:url,qs:form},function(err,resp,html){    //get 用qs來傳送參數
-		if(html!=""){
-			console.log("html load success\n");
-			var $ = cheerio.load(html);
-			var title;
-			var	author;
-			console.log('statusCode:', resp && resp.statusCode);
-			var json = {title:"",author:"",link:""};
-
-			var Allpage = $(".list_info").find("p").text().trim();
-			Allpage = Allpage.split("/")[0];
-			Allpage = Allpage.replace(/ /,"");
-			Allpage = Allpage.split(",")[1];
-			Allpage = Allpage.replace("共 ","");
-			Allpage = Allpage.replace(" 筆","");
-			console.log("All Page : "+Allpage);
-
-			$(".list_box").filter(function(){
-					var data_title = $(this).children().find("li>a").text().trim();
-					var data_author = $(this).children().find(".product_info_content>p").first().text().trim();
-					var data_link = $(this).children().find("li>a").attr("href");
-
-					data_author = data_author.replace("作者:","");
-
-					if(data_title!=""){
-						json.title = data_title;
-						json.author = data_author;
-						json.link = "http://webpac.lib.ntpu.edu.tw/"+data_link;
-						console.log(json);
-						ref.push(json);
-					}
-			})
-			
-		}
-		else
-		{
-			console.log("html failed!");
-		}
-		//console.log(html);
-	});
-	//db.ref('/').update({isFinish:"True"});
-}
+Xinpei();
 function test_for_url_scrape()
 {
 	request("http://webpac.lib.ntpu.edu.tw/content.cfm?mid=153578&m=ss&k0=java&t0=k&c0=and&list_num=40&current_page=1&mt=&at=&sj=&py=&it=&lr=&lg=&si=6",function(err,resp,html){    //get 用qs來傳送參數
@@ -446,8 +427,6 @@ var testJson3 = {
 		}
 	}
 }
-db.ref('search_result_test').child("00000001").remove();
-
 const isbn = "00000002";
 
 /*   // this code is detect that if isbn in search_result is exist or not (unapply)
