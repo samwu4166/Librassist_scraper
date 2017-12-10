@@ -130,7 +130,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/te
 // [END all]
 
 exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/key')
-    .onWrite(event => {
+    .onCreate(event => {
 
     	const uid = event.params.userId;
     	console.log("uid is "+uid);
@@ -198,6 +198,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/key
 				});
 			return Promise.all([searchrp]).then(()=>{
 					console.log("Scrape "+key+" success");
+					event.data.ref.parent.child('key').remove();
 					return event.data.ref.parent.child('isFinish').set("true");
 			})
     	});
