@@ -99,7 +99,7 @@ function ntpu(books,page,list_max)
 	});
 	//db.ref('/').update({isFinish:"True"});
 }
-function test_for_sync_scrape()
+function test_for_url_scrape()
 {
 	request("http://webpac.lib.ntpu.edu.tw/content.cfm?mid=153578&m=ss&k0=java&t0=k&c0=and&list_num=40&current_page=1&mt=&at=&sj=&py=&it=&lr=&lg=&si=6",function(err,resp,html){    //get 用qs來傳送參數
 		if(html!=""){
@@ -120,6 +120,8 @@ function test_for_sync_scrape()
 							var publish_year = $(".info").find("p").html().split("<br>")[2].trim();
 							publish_year = publish_year.replace("出版年 :",'');
 
+							var image = $(".photo").find("img").attr("src");
+
 							var ISBN_tag = false;
 							var ISBN = $(".info_box").find("p").html().split("<br>");
 							for(var key in ISBN)
@@ -130,20 +132,38 @@ function test_for_sync_scrape()
 									var first_ISBN = text.replace("ISBN ： ","");
 									
 									first_ISBN = first_ISBN.split(" ",1);
-									
 									//console.log(first_ISBN);
 									ISBN_tag=true;
 									break;
 								}
 							}
+							var true_isbn = first_ISBN[0];
+							if(true_isbn.search("平裝"))
+								true_isbn = true_isbn.replace("平裝","");
+							var count=0;
+							$("tbody").each(function(){
+								var text = $(this).text().trim();
+								
+								if(text.search("Available")>0){
+									count++;
+								}
+							})
+
 
 							var Bookjson = {
-								"標題":title,
-								"作者":author,
-								"出版社":publisher,
-								"出版年份":publish_year,
-								"ISBN":first_ISBN[0]
-							};
+								[true_isbn]:
+									{
+										"title":title,
+										"lib":{ntpu:count},
+										"img":image,
+										"publish_year":publish_year,
+										"publisher":publisher,
+										"trivial":{
+											isFinish:"true",
+											refresh:"false"
+										},
+									}
+								};
 							
 							console.log(Bookjson);
 		}
@@ -323,7 +343,7 @@ function test_cloud_prepared(keyvalue,page)
 		})
 		return console.log("end of scrape");
 }
-function test(){
+function test_for_search_url(){
 
     var links=[];
 
@@ -398,11 +418,57 @@ function test(){
 function sleep(ms) {
   			return new Promise(resolve => setTimeout(resolve, ms));
 		}
-//test_cloud_prepared("財務管理","1");
-//sleep(1500);
-//test_cloud_prepared("python","1");
+var testJson = {
+	"00000001":
+	{
+		"lib":
+		{
+			"sinpei":"1"
+		}
+	}
+}
+var testJson2 = {
+	"00000001":
+	{
+		"lib":
+		{
+			"taipei":"1"
+		}
+	}
+}
 
-//console.log(parseInt("24"));
-//ntpu("c++","1","20");
-//test();
-test_for_sync_scrape();
+var testJson3 = {
+	"00000002":
+	{
+		"lib":
+		{
+			"ntpu":"1"
+		}
+	}
+}
+db.ref('search_result_test').child("00000001").remove();
+
+const isbn = "00000002";
+
+/*   // this code is detect that if isbn in search_result is exist or not (unapply)
+db.ref('/search_result_test/'+isbn+'/').once('value')
+.then(function(snap){
+	var a = snap.exists();
+	if(a)
+	{
+		var value = snap.child('lib').val();
+		
+		value.ntpu = "0";
+		var json = {"lib":value};
+		console.log(json);
+		db.ref('search_result_test/'+isbn+'/').update(json);
+		console.log("exist!");
+	}
+	else
+	{
+		db.ref('search_result_test/').update(testJson3);
+		console.log("create new one");
+	}
+})
+*/
+//console.log(testJson);

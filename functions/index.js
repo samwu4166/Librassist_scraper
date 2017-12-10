@@ -28,11 +28,14 @@ const admin = require('firebase-admin');
 admin.initializeApp(functions.config().firebase);
 // [END import]
 
-exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/search_result/{pushId}/link')
+exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/temp_result/{pushId}/link')
     .onCreate(event => {
    
 	const searchUrl = event.data.val();
+	const uid = event.params.userId;
+	const root = event.data.ref.root;
 	event.data.ref.parent.child('isFinish').set("Pending!");
+	// set request-promise options 
 	var options = {
 			    uri: searchUrl,
 			    headers: {
@@ -42,6 +45,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/se
 			    },
 			    json: true, // Automatically parses the JSON string in the response
 				transform: function(body){
+					// use decodeEntities to prevent wrong chinese
 					return cheerio.load(body,{decodeEntities: false});
 				}
 			};
@@ -59,6 +63,10 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/se
 				var publish_year = $(".info").find("p").html().split("<br>")[2].trim();
 				publish_year = publish_year.replace("出版年 : ",'');
 
+				var image = $(".photo").find("img").attr("src");
+
+				var links = searchUrl;
+
 				var ISBN_tag = false;
 				var ISBN = $(".info_box").find("p").html().split("<br>");
 				for(var key in ISBN)
@@ -66,6 +74,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/se
 					var text = ISBN[key].trim();
 					if(!text.search("ISBN") && ISBN_tag==false)
 					{
+						//deal with some word behind isbn by split the space
 						var first_ISBN = text.replace("ISBN ： ","");
 						first_ISBN = first_ISBN.split(" ",1);
 						//console.log(first_ISBN);
@@ -73,22 +82,44 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/se
 						break;
 					}
 				}
+				var true_isbn = first_ISBN[0];
+				// deal with chinese without space
+				if(true_isbn.search("平裝"))
+					true_isbn = true_isbn.replace("平裝","");
+
+				var count=0;
+				$("tbody").each(function(){
+					var text = $(this).text().trim();
+								
+					if(text.search("Available")>0){
+						count++;
+					}
+				})
 
 				var Bookjson = {
-					"title":title,
-					"author":author,
-					"publisher":publisher,
-					"publish_year":publish_year,
-					"ISBN":first_ISBN[0],
-					"isFinish":"true"
-				};
-				event.data.ref.parent.update(Bookjson);			
+						[true_isbn]:
+							{
+								"title":title,
+								"author":author,
+								"img":image,
+								"publish_year":publish_year,
+								"publisher":publisher,
+								"link":links,
+								"lib":{ntpu:count},
+								"trivial":{
+									isFinish:"true",
+									refresh:"false"
+								},
+							}
+						};
+				admin.database().ref('/user_data/'+uid+'/search/search_result').update(Bookjson);
+				//event.data.ref.parent.update(Bookjson);			
 		})
 		.catch(function(err){
 			console.log(err);
 		});		
-	return Promise.all([searchrp]).then(()=>{
-				return event.data.ref.parent.child('isFinish').set("true");
+		return Promise.all([searchrp]).then(()=>{
+				return event.data.ref.parent.remove();
 			})
 			.catch(function(err){
 				console.log(err);
@@ -135,7 +166,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/key
 						var title;
 						var	author;
 					
-						var json = {title:"",author:"",link:"",location:"ntpu",refresh:"false"};
+						var json = {title:"",author:"",link:"",refresh:"false"};
 						$(".list_box").filter(function(){
 								var data_title = $(this).children().find("li>a").text().trim();
 								var data_author = $(this).children().find(".product_info_content>p").first().text().trim();
@@ -148,7 +179,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/key
 									json.author = data_author;
 									json.link = getlink;
 									json.img = image;
-									event.data.ref.parent.child('search_result').push(json);
+									event.data.ref.parent.child('temp_result').push(json);
 								}
 						})
 
@@ -172,10 +203,8 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/key
     	});
     });
 
-exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/search_result/{pushId}/refresh')
+exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/temp_result/{pushId}/refresh')
 	.onUpdate(event => {
-
-			
 
 			return event.data.ref.parent.child('link').once('value')
 			.then(function(snapshot) {
@@ -197,50 +226,75 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/search
 			const refresh_search = rp(options)
 				.then(function($){		
 					
+				var title = $(".info").first().find("h2").text().trim();
 
-					var title = $(".info").first().find("h2").text().trim();
+				var author = $(".info").find("p").html().split("<br>")[0].trim();
+				author = author.replace('作者 :','');
 
-					var author = $(".info").find("p").html().split("<br>")[0].trim();
-					author = author.replace('作者 :','');
+				var publisher = $(".info").find("p").html().split("<br>")[1].trim();
+				publisher = publisher.replace('出版社 :','');
 
-					var publisher = $(".info").find("p").html().split("<br>")[1].trim();
-					publisher = publisher.replace('出版社 :','');
+				var publish_year = $(".info").find("p").html().split("<br>")[2].trim();
+				publish_year = publish_year.replace("出版年 : ",'');
 
-					var publish_year = $(".info").find("p").html().split("<br>")[2].trim();
-					publish_year = publish_year.replace("出版年 : ",'');
+				var image = $(".photo").find("img").attr("src");
 
-					var ISBN_tag = false;
-					var ISBN = $(".info_box").find("p").html().split("<br>");
-					for(var key in ISBN)
+				var links = searchUrl;
+
+				var ISBN_tag = false;
+				var ISBN = $(".info_box").find("p").html().split("<br>");
+				for(var key in ISBN)
+				{
+					var text = ISBN[key].trim();
+					if(!text.search("ISBN") && ISBN_tag==false)
 					{
-						var text = ISBN[key].trim();
-						if(!text.search("ISBN") && ISBN_tag==false)
-						{
-							var first_ISBN = text.replace("ISBN ： ","");
-							first_ISBN = first_ISBN.split(" ",1);
-							//console.log(first_ISBN);
-							ISBN_tag=true;
-							break;
-						}
+						//deal with some word behind isbn by split the space
+						var first_ISBN = text.replace("ISBN ： ","");
+						first_ISBN = first_ISBN.split(" ",1);
+						//console.log(first_ISBN);
+						ISBN_tag=true;
+						break;
 					}
+				}
+				var true_isbn = first_ISBN[0];
+				// deal with chinese without space
+				if(true_isbn.search("平裝"))
+					true_isbn = true_isbn.replace("平裝","");
 
-					var Bookjson = {
-						"title":title,
-						"author":author,
-						"publisher":publisher,
-						"publish_year":publish_year,
-						"ISBN":first_ISBN[0],
-						"isFinish":"true"
-					};
-					event.data.ref.parent.update(Bookjson);	
-								//console.log(Bookjson);		
+				var count=0;
+				$("tbody").each(function(){
+					var text = $(this).text().trim();
+								
+					if(text.search("Available")>0){
+						count++;
+					}
+				})
+
+				var Bookjson = {
+						[true_isbn]:
+							{
+								"title":title,
+								"author":author,
+								"img":image,
+								"publish_year":publish_year,
+								"publisher":publisher,
+								"links":links,
+								"lib":{ntpu:count},
+								"trivial":{
+									isFinish:"true",
+									refresh:"false"
+								},
+							}
+						};
+				admin.database().ref('/user_data/'+uid+'/search/search_result').update(Bookjson);
+
 			})
 			.catch(function(err){
 				console.log(err);
 				//console.log("too late!");
 			});
 			return Promise.all([refresh_search]).then(()=>{
-					return event.data.ref.parent.child('isFinish').set("true");
+					return event.data.ref.parent.remove();
 			})
 		})
 	});
