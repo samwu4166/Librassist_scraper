@@ -123,7 +123,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/te
 								"publish_year":publish_year,
 								"publisher":publisher,
 								"link":links,
-								"ntpu":count,
+								"ntpu_lib":count,
 								"isFinish":"true"
 						};
 				//push the json to firebase
@@ -131,6 +131,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/te
 				
 		})
 		.catch(function(err){
+			event.data.ref.parent.remove();
 			console.log(err);
 		});		
 		//return the request-promise to avoid this function being canceled
@@ -278,24 +279,19 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/temp_r
 						count++;
 					}
 				})
-
-				var Bookjson = {
-						[true_isbn]:
-							{
+				var jsons = {
+								"isbn":true_isbn,
 								"title":title,
 								"author":author,
 								"img":image,
 								"publish_year":publish_year,
 								"publisher":publisher,
-								"links":links,
-								"lib":{ntpu:count},
-								"trivial":{
-									isFinish:"true",
-									refresh:"false"
-								},
-							}
+								"link":links,
+								"ntpu_lib":count,
+								"isFinish":"true"
 						};
-				admin.database().ref('/user_data/'+uid+'/search/search_result').update(Bookjson);
+				
+				admin.database().ref('/user_data/'+uid+'/search/search_result').push(jsons);
 
 			})
 			.catch(function(err){

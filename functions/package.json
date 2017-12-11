@@ -10,7 +10,7 @@
     "mocha": "latest",
     "phantom": "latest",
     "request": "latest",
-    "request-promise": "^4.2.2",
+    "request-promise": "latest",
     "sinon": "latest"
   },
   "scripts": {

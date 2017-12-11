@@ -28,7 +28,41 @@ var db = firebase.database();
 
 //ref.update({"nickname":"Handsome"});
 
+function ntpu_hot(){
 
+	var options = {
+			    uri: 'http://webpac.lib.ntpu.edu.tw/search.cfm?',
+			    headers: {
+			        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
+					"Accept-Language":"en-US,en;q=0.9",
+					"Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+					"Connection":"keep-alive"
+			    },
+			    json: true, // Automatically parses the JSON string in the response
+				transform: function(body){
+					console.log(body);
+					return cheerio.load(body,{decodeEntities: false});
+				}
+			};
+	const pr = rp(options)
+	.then(function($){
+				
+		//const fruits = [];
+		$("#keyword ul").each(function(i,element){
+			console.log($(this).find("li>a").text());
+		})
+		
+		//console.log(test);
+	})
+	.catch(reason =>{
+		console.log(reason);
+	})
+	return Promise.all([pr]).then(()=>{
+		console.log("finish!");
+	})
+	
+}
+ntpu_hot();
 function Xinpei(){
 
 
@@ -79,7 +113,6 @@ function Xinpei(){
 	})
 	
 }
-Xinpei();
 function test_for_url_scrape()
 {
 	request("http://webpac.lib.ntpu.edu.tw/content.cfm?mid=153578&m=ss&k0=java&t0=k&c0=and&list_num=40&current_page=1&mt=&at=&sj=&py=&it=&lr=&lg=&si=6",function(err,resp,html){    //get 用qs來傳送參數
