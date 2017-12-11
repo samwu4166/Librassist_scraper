@@ -49,6 +49,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/te
 					return cheerio.load(body,{decodeEntities: false});
 				}
 			};
+			//start a request promise and parse the html
 	const searchrp = rp2(options)
 			.then(function($){		
 				
@@ -95,7 +96,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/te
 						count++;
 					}
 				})
-
+				/*	Abandaned
 				var Bookjson = {
 						[true_isbn]:
 							{
@@ -112,17 +113,32 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/te
 								},
 							}
 						};
-				admin.database().ref('/user_data/'+uid+'/search/search_result').update(Bookjson);
-				//event.data.ref.parent.update(Bookjson);			
+						*/
+				//set the json
+				var jsons = {
+								"isbn":true_isbn,
+								"title":title,
+								"author":author,
+								"img":image,
+								"publish_year":publish_year,
+								"publisher":publisher,
+								"link":links,
+								"ntpu":count,
+								"isFinish":"true"
+						};
+				//push the json to firebase
+				admin.database().ref('/user_data/'+uid+'/search/search_result').push(jsons);
+				
 		})
 		.catch(function(err){
 			console.log(err);
 		});		
+		//return the request-promise to avoid this function being canceled
 		return Promise.all([searchrp]).then(()=>{
 				return event.data.ref.parent.remove();
 			})
 			.catch(function(err){
-				console.log("search ",searchUrl," wrond!");
+				console.log("search ",searchUrl," wrong!");
 			})
       // [END searchkeyBody]
     });
@@ -186,10 +202,11 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/key
 				})
 				.catch(function(err){
 					console.log(err);
+					return event.data.ref.parent.child('error_occur').set(err);
 				});
 			return Promise.all([searchrp]).then(()=>{
 					console.log("Scrape "+key+" success");
-					event.data.ref.parent.child('key').remove();
+					//event.data.ref.parent.child('key').remove();
 					return event.data.ref.parent.child('isFinish').set("true");
 			})
     	});
@@ -197,7 +214,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/key
 
 exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/temp_result_ntpu/{pushId}/refresh')
 	.onUpdate(event => {
-
+			const uid = event.params.userId;
 			return event.data.ref.parent.child('link').once('value')
 			.then(function(snapshot) {
 				return snapshot.val();
