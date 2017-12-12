@@ -56,7 +56,7 @@ function Xinpei(){
 		var json={};
 		var cn = -1;
 		var cnn="";
-		$(".data_reslt").filter(function(){
+		$(".is_img").filter(function(){
 
 				var data_title = $(this).find(".reslt_item_head").text().trim();
 				var data_author = $(this).find(".crs_author").text().trim();
@@ -66,9 +66,10 @@ function Xinpei(){
 				cn++;
 				var data_count = $(this).find("#MyPageLink_4"+cnn).text().trim();
 				data_count = data_count.replace(" 本館藏 可借閱", "");
-
+				var image = $(this).find(".img_reslt>a>img").attr("src");
 				data_title = data_title.replace("/","");
 				json.title = data_title;
+				json.img = image;
 				json.author = data_author;
 				json.xinpei_lib = data_count;
 				json.link = "http://webpac.tphcc.gov.tw"+links;
@@ -84,7 +85,7 @@ function Xinpei(){
 	})
 	
 }
-	
+Xinpei();
 function Key(){	
 	var url = "http://www.books.com.tw/web/books/?loc=menu_1_001", keywords;
 	var options = {
@@ -123,7 +124,8 @@ function Key(){
 	})
 }
 //
-Key();
+var a = 1;
+console.log(typeof (a+""));
 function test_for_url_scrape()
 {
 	request("http://webpac.lib.ntpu.edu.tw/content.cfm?mid=153578&m=ss&k0=java&t0=k&c0=and&list_num=40&current_page=1&mt=&at=&sj=&py=&it=&lr=&lg=&si=6",function(err,resp,html){    //get 用qs來傳送參數

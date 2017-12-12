@@ -116,6 +116,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{t
 						};
 						*/
 				//set the json
+				count = count+"";
 				var jsons = {
 								"isbn":true_isbn,
 								"title":title,
@@ -124,7 +125,8 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{t
 								"publish_year":publish_year,
 								"publisher":publisher,
 								"link":links,
-								"ntpu_lib":count,
+								"storage":count,
+								"location":"ntpu_lib",
 								"searchState":"true"
 						};
 				//push the json to firebase
@@ -140,6 +142,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{t
 				return event.data.ref.parent.remove();
 			})
 			.catch(function(err){
+				event.data.ref.parent.child('refresh').set('go');
 				console.log("Promise ",searchUrl," wrong!");
 			})
       // [END searchkeyBody]
@@ -196,6 +199,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{ti
 									json.author = data_author;
 									json.link = getlink;
 									json.img = image;
+									json.location = "ntpu_lib";
 									json.searchState = "false";
 									admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/temp_search_ntpu').push(json);
 									
@@ -217,7 +221,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{ti
     	
     });
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}/temp_result_ntpu/{pushId}/refresh')
+exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}/temp_search_ntpu/{pushId}/refresh')
 	.onUpdate(event => {
 			const uid = event.params.userId;
 			const local_time = event.params.time;
@@ -284,6 +288,7 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}
 						count++;
 					}
 				})
+				count= count+"";
 				var jsons = {
 								"isbn":true_isbn,
 								"title":title,
@@ -292,7 +297,8 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}
 								"publish_year":publish_year,
 								"publisher":publisher,
 								"link":links,
-								"ntpu_lib":count,
+								"location":"ntpu_lib",
+								"storage":count,
 								"searchState":"true"
 						};
 				
@@ -343,20 +349,23 @@ exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{
 					var json = {};
 					var cn = -1;
 					var cnn="";
-					$(".data_reslt").filter(function(){
+					$(".is_img").filter(function(){
 						
 						var data_title = $(this).find(".reslt_item_head").text().trim();
 						var data_author = $(this).find(".crs_author").text().trim();
 						var links = $(this).find(".reslt_item_head>a").attr("href");
 						if(cn >= 0) cnn="_"+cn;
 						cn++;
+						var image = $(this).find(".img_reslt>a>img").attr("src");
 						var data_count = $(this).find("#MyPageLink_4"+cnn).text().trim();
 						data_count = data_count.replace(" 本館藏 可借閱", "");
 						data_title = data_title.replace("/","");
 						json.title = data_title;
 						json.author = data_author;
+						json.location = "ntc_lib";
 						json.link = "http://webpac.tphcc.gov.tw"+links;
 						json.xinpei_lib = data_count;
+						json.img = image;
 						json.searchState = "false";
 
 						event.data.ref.parent.child('temp_result_Xinpei').push(json);
@@ -431,12 +440,13 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
 					}
 					data_isbn = data_isbn.replace("平裝", "");
 
+					json.location = "ntc_lib";
 					json.author = data_author;
 					json.isbn = data_isbn;
 					json.publish_year = data_year;
 					json.publisher = data_publisher;
 					json.link = searchUrl;
-					json.xinpei_lib = count_book;
+					json.storage = count_book;
 					json.searchState = "true";
 				
 			})
