@@ -32,7 +32,7 @@ function Xinpei(){
 	var options = {
 			    uri: 'http://webpac.tphcc.gov.tw/toread/opac/search?',
 			    qs: {
-			        q:"python",
+			        q:"股票",
 			        max:"0",
 			        view:"CONTENT",
 			        location:"0",
@@ -66,7 +66,13 @@ function Xinpei(){
 				cn++;
 				var data_count = $(this).find("#MyPageLink_4"+cnn).text().trim();
 				data_count = data_count.replace(" 本館藏 可借閱", "");
-				var image = $(this).find(".img_reslt>a>img").attr("src");
+				var image = $(this).find("img").attr("src");
+				
+				if(image == '/toread/images/macheteicons/book.gif')
+				{
+					image = "http://webpac.tphcc.gov.tw/toread/images/macheteicons/book.gif";
+				}
+				
 				data_title = data_title.replace("/","");
 				json.title = data_title;
 				json.img = image;
@@ -85,6 +91,7 @@ function Xinpei(){
 	})
 	
 }
+Xinpei();
 function new_book(){	
 	var url = "http://webpac.lib.ntpu.edu.tw/newbook_focus.cfm";
 	var options = {
@@ -126,7 +133,6 @@ function new_book(){
 		console.log("finish");
 	})
 }
-new_book();
 function test_for_url_scrape()
 {
 	request("http://webpac.lib.ntpu.edu.tw/content.cfm?mid=153578&m=ss&k0=java&t0=k&c0=and&list_num=40&current_page=1&mt=&at=&sj=&py=&it=&lr=&lg=&si=6",function(err,resp,html){    //get 用qs來傳送參數

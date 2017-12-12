@@ -53,7 +53,19 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{t
 			//start a request promise and parse the html
 	const searchrp = rp2(options)
 			.then(function($){		
-				
+				var jsons = {
+								"isbn":"",
+								"title":"",
+								"author":"",
+								"img":"",
+								"publish_year":"",
+								"publisher":"",
+								"link":"",
+								"storage":"",
+								"location":"",
+								"searchState":""
+						};
+
 				var title = $(".info").first().find("h2").text().trim();
 
 				var author = $(".info").find("p").html().split("<br>")[0].trim();
@@ -66,6 +78,10 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{t
 				publish_year = publish_year.replace("出版年 : ",'');
 
 				var image = $(".photo").find("img").attr("src");
+				if(image == null)
+				{
+					image = "";
+				}
 
 				var links = searchUrl;
 
@@ -86,9 +102,12 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{t
 				}
 				var true_isbn = first_ISBN[0];
 				// deal with chinese without space
-				if(true_isbn.search("平裝"))
-					true_isbn = true_isbn.replace("平裝","");
+				
+				true_isbn = true_isbn.replace("平裝","");
+				true_isbn = true_isbn.replace("精裝","");
+				true_isbn = true_isbn.replace("()","");
 
+				
 				var count=0;
 				$("tbody").each(function(){
 					var text = $(this).text().trim();
@@ -117,7 +136,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{t
 						*/
 				//set the json
 				count = count+"";
-				var jsons = {
+				jsons = {
 								"isbn":true_isbn,
 								"title":title,
 								"author":author,
@@ -186,7 +205,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{ti
 						var title;
 						var	author;
 					
-						var json = {title:"",author:"",link:"",refresh:"false"};
+						var json = {title:"",author:"",link:"",refresh:"false",img:"",searchState:"",location:""};
 						$(".list_box").filter(function(){
 								var data_title = $(this).children().find("li>a").text().trim();
 								var data_author = $(this).children().find(".product_info_content>p").first().text().trim();
@@ -243,8 +262,22 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}
 							}
 						};
 			const refresh_search = rp(options)
-				.then(function($){		
-					
+				.then(function($){	
+
+				var jsons = {
+								"isbn":"",
+								"title":"",
+								"author":"",
+								"img":"",
+								"publish_year":"",
+								"publisher":"",
+								"link":"",
+								"location":"",
+								"storage":"",
+								"searchState":""
+						};
+
+
 				var title = $(".info").first().find("h2").text().trim();
 
 				var author = $(".info").find("p").html().split("<br>")[0].trim();
@@ -289,7 +322,7 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}
 					}
 				})
 				count= count+"";
-				var jsons = {
+				jsons = {
 								"isbn":true_isbn,
 								"title":title,
 								"author":author,
@@ -306,11 +339,14 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}
 
 			})
 			.catch(function(err){
-				event.data.ref.parent.chile('searchState').set(err);
+				console.log(err);
 				//console.log("too late!");
 			});
 			return Promise.all([refresh_search]).then(()=>{
 					return event.data.ref.parent.remove();
+			})
+			.catch(reason=>{
+				return event.data.ref.parent.child('searchState').set(err);
 			})
 		})
 	});
@@ -322,7 +358,7 @@ exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{
     	const local_time = event.params.time;
     	console.log("(sinpei)uid is "+uid);
     	const root = event.data.ref.root;
-		    	
+    	
     	const key = event.data.val();
     	event.data.ref.parent.child('Xinpei_url').set("false");
     	var options = {
@@ -346,7 +382,7 @@ exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{
 				};
  				const searchrp = rp(options)
 				.then(function($){
-					var json = {};
+					var json = {title:"",author:"",location:"",link:"",img:"",searchState:"",xinpei_lib:""};
 					var cn = -1;
 					var cnn="";
 					$(".is_img").filter(function(){
@@ -356,8 +392,14 @@ exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{
 						var links = $(this).find(".reslt_item_head>a").attr("href");
 						if(cn >= 0) cnn="_"+cn;
 						cn++;
-						var image = $(this).find(".img_reslt>a>img").attr("src");
+						var image = $(this).find("img").attr("src");
 						var data_count = $(this).find("#MyPageLink_4"+cnn).text().trim();
+
+						if(image == '/toread/images/macheteicons/book.gif')
+						{
+							image = "http://webpac.tphcc.gov.tw/toread/images/macheteicons/book.gif";
+						}
+
 						data_count = data_count.replace(" 本館藏 可借閱", "");
 						data_title = data_title.replace("/","");
 						json.title = data_title;
@@ -377,7 +419,7 @@ exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{
 					console.log(err);
 				});
 			return Promise.all([searchrp]).then(()=>{
-					console.log("(sinpei)Scrape "+key+" success");
+					console.log("(inpei)Scrape "+key+" success");
 					return event.data.ref.parent.child('Xinpei_url').set("true");
 			})
 			.catch(reason => {
@@ -412,7 +454,18 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
 			};
 		const searchrp = rp(options).then(function($){
 			var title, author, isbn, year, publisher, img;
-			var json = {};
+			var json = {		
+								"isbn":"",
+								"title":"",
+								"author":"",
+								"img":"",
+								"publish_year":"",
+								"publisher":"",
+								"link":"",
+								"storage":"",
+								"location":"",
+								"searchState":""
+							};
 			
 			$(".reslt_item_head").filter(function(){       //title
 				var data_title = $(this).text().trim();
@@ -421,6 +474,10 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
 			})
 			$(".img_reslt").filter(function(){       //image
 				var data_img = $(this).find("#Any_10").attr("src");
+				if(data_img == null)
+				{
+					data_img = "";
+				}
 				json.img = data_img;
 			})
 
@@ -439,6 +496,8 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
 								data_publisher = $(this).find("#For_"+i+">td").text().trim();
 					}
 					data_isbn = data_isbn.replace("平裝", "");
+					data_isbn = data_isbn.replace("精裝", "");
+					data_isbn = data_isbn.replace("()", "");
 
 					json.location = "ntc_lib";
 					json.author = data_author;
