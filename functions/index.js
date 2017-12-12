@@ -457,11 +457,12 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 exports.hot_key_info = functions.database.ref('/hot_key/trigger')
-	.onWrite(event => {
+	.onDelete(event => {
 		var url = "http://www.books.com.tw/web/books/?loc=menu_1_001", keywords;
 
 		event.data.ref.parent.child('result').remove();
 		event.data.ref.parent.child('isFinish').set('false');
+		event.data.ref.parent.child('trigger').set('searching');
 		var options = {
 			    uri: url,
 			    headers: {
@@ -492,6 +493,7 @@ exports.hot_key_info = functions.database.ref('/hot_key/trigger')
 		});
 		
 		return Promise.all([keyrp]).then(()=>{
+			event.data.ref.parent.child('trigger').set('deleteMe');
 			event.data.ref.parent.child('isFinish').set('true');
 		})
 
