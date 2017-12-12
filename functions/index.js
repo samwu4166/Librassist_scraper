@@ -28,13 +28,14 @@ const admin = require('firebase-admin');
 admin.initializeApp(functions.config().firebase);
 // [END import]
 
-exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/temp_result_ntpu/{pushId}/link')
+exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{time}/temp_search_ntpu/{pushId}/link')
     .onCreate(event => {
    
 	const searchUrl = event.data.val();
 	const uid = event.params.userId;
+	const local_time = event.params.time;
 	const root = event.data.ref.root;
-	event.data.ref.parent.child('isFinish').set("Pending!");
+	event.data.ref.parent.child('searchState').set("Pending!");
 	// set request-promise options 
 	var options = {
 			    uri: searchUrl,
@@ -124,49 +125,48 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/te
 								"publisher":publisher,
 								"link":links,
 								"ntpu_lib":count,
-								"isFinish":"true"
+								"searchState":"true"
 						};
 				//push the json to firebase
-				admin.database().ref('/user_data/'+uid+'/search/search_result').push(jsons);
+				admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/search_result').push(jsons);
 				
 		})
 		.catch(function(err){
-			event.data.ref.parent.remove();
-			console.log(err);
+			event.data.ref.parent.child('searchState').set(err);
+			//console.log(err);
 		});		
 		//return the request-promise to avoid this function being canceled
 		return Promise.all([searchrp]).then(()=>{
 				return event.data.ref.parent.remove();
 			})
 			.catch(function(err){
-				console.log("search ",searchUrl," wrong!");
+				console.log("Promise ",searchUrl," wrong!");
 			})
       // [END searchkeyBody]
     });
 // [END searchkey]
 // [END all]
 
-exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/key')
+exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{time}/key')
     .onCreate(event => {
 
     	const uid = event.params.userId;
+    	const local_time = event.params.time;
     	console.log("uid is "+uid);
     	const root = event.data.ref.root;
-    	const pr = event.data.ref.parent.child('currentPage').once('value');
-		
-    	return Promise.all([pr]).then(results =>{
-    		const key = event.data.val();
-    		const page = results[0].val();
-    		console.log("page is ",page);
-    		var options = {
+    
+    	event.data.ref.parent.child('ntpu_url').set('false');
+    	const key = event.data.val();
+    		
+    	var options = {
 				    uri: 'http://webpac.lib.ntpu.edu.tw/search.cfm?',
 				    qs: {
 				        m:"ss",
 				        k0:key,
 				        t0:"k",
 				        c0:"and",
-				        list_num:"40",
-				        current_page:page,
+				        list_num:"20",
+				        current_page:"1",
 				    },
 				    headers: {
 				        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
@@ -196,26 +196,31 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/key
 									json.author = data_author;
 									json.link = getlink;
 									json.img = image;
-									event.data.ref.parent.child('temp_result_ntpu').push(json);
+									json.searchState = "false";
+									admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/temp_search_ntpu').push(json);
+									
 								}
 						})
 
 				})
 				.catch(function(err){
 					console.log(err);
-					return event.data.ref.parent.child('error_occur').set(err);
 				});
 			return Promise.all([searchrp]).then(()=>{
 					console.log("Scrape "+key+" success");
 					//event.data.ref.parent.child('key').remove();
-					return event.data.ref.parent.child('isFinish').set("true");
+					return event.data.ref.parent.child('ntpu_url').set('true');;
 			})
-    	});
+			.catch(reason => {
+				console.log(reason);
+			});
+    	
     });
 
-exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/temp_result_ntpu/{pushId}/refresh')
+exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}/temp_result_ntpu/{pushId}/refresh')
 	.onUpdate(event => {
 			const uid = event.params.userId;
+			const local_time = event.params.time;
 			return event.data.ref.parent.child('link').once('value')
 			.then(function(snapshot) {
 				return snapshot.val();
@@ -288,14 +293,14 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/temp_r
 								"publisher":publisher,
 								"link":links,
 								"ntpu_lib":count,
-								"isFinish":"true"
+								"searchState":"true"
 						};
 				
-				admin.database().ref('/user_data/'+uid+'/search/search_result').push(jsons);
+				admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/search_result').push(jsons);
 
 			})
 			.catch(function(err){
-				console.log(err);
+				event.data.ref.parent.chile('searchState').set(err);
 				//console.log("too late!");
 			});
 			return Promise.all([refresh_search]).then(()=>{
@@ -305,20 +310,21 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/temp_r
 	});
 
 
-exports.sinpei_search_url = functions.database.ref('/user_data/{userId}/search/key')
+exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{time}/key')
     .onCreate(event => {
 
     	const uid = event.params.userId;
+    	const local_time = event.params.time;
     	console.log("(sinpei)uid is "+uid);
     	const root = event.data.ref.root;
-    	
+		    	
     	const key = event.data.val();
-    		
+    	event.data.ref.parent.child('Xinpei_url').set("false");
     	var options = {
 			    uri: 'http://webpac.tphcc.gov.tw/toread/opac/search?',
 			    qs: {
 			        q:key,
-			        max:"2",
+			        max:"1",  //2->50 books
 			        view:"CONTENT",
 			        location:"0",
 			    },
@@ -335,29 +341,114 @@ exports.sinpei_search_url = functions.database.ref('/user_data/{userId}/search/k
 				};
  				const searchrp = rp(options)
 				.then(function($){
-					var title;
-					var	author;
-
-					var json = {title:"",author:""};
+					var json = {};
+					var cn = -1;
+					var cnn="";
 					$(".data_reslt").filter(function(){
-							var data_title = $(this).find(".reslt_item_head").text().trim();
-							var data_author = $(this).find(".crs_author").text().trim();
-							var links = $(this).find(".reslt_item_head>a").attr("href");
+						
+						var data_title = $(this).find(".reslt_item_head").text().trim();
+						var data_author = $(this).find(".crs_author").text().trim();
+						var links = $(this).find(".reslt_item_head>a").attr("href");
+						if(cn >= 0) cnn="_"+cn;
+						cn++;
+						var data_count = $(this).find("#MyPageLink_4"+cnn).text().trim();
+						data_count = data_count.replace(" 本館藏 可借閱", "");
+						data_title = data_title.replace("/","");
+						json.title = data_title;
+						json.author = data_author;
+						json.link = "http://webpac.tphcc.gov.tw"+links;
+						json.xinpei_lib = data_count;
+						json.searchState = "false";
 
-							data_title = data_title.replace("/","");
-							json.title = data_title;
-							json.author = data_author;
-							json.link = "http://webpac.tphcc.gov.tw"+links;
-							
-							event.data.ref.parent.child('temp_result_sinpei').push(json);
-						})
+						event.data.ref.parent.child('temp_result_Xinpei').push(json);
+					})
+					
+
 				})
 				.catch(function(err){
 					console.log(err);
 				});
 			return Promise.all([searchrp]).then(()=>{
 					console.log("(sinpei)Scrape "+key+" success");
-					return event.data.ref.parent.child('SinpeisFinish').set("true");
+					return event.data.ref.parent.child('Xinpei_url').set("true");
 			})
     	
     });
+
+exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/{time}/temp_result_Xinpei/{pushId}/link')
+    .onCreate(event => {
+    const searchUrl = event.data.val();
+	const uid = event.params.userId;
+	const local_time = event.params.time;
+	const pr1 = event.data.ref.parent.child('xinpei_lib').once('value');
+	const root = event.data.ref.root;
+	event.data.ref.parent.child('searchState').set("Pending!");
+	return Promise.all([pr1]).then( results => {
+
+		const count_book = results[0].val();
+		var options = {
+			    uri: searchUrl,
+			    headers: {
+			        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
+					"Accept-Language":"en-US,en;q=0.9",
+					"Connection":"keep-alive"
+			    },
+			    json: true, // Automatically parses the JSON string in the response
+				transform: function(body){
+					// use decodeEntities to prevent wrong chinese
+					return cheerio.load(body,{decodeEntities: false});
+				}
+			};
+		const searchrp = rp(options).then(function($){
+			var title, author, isbn, year, publisher, img;
+			var json = {};
+			
+			$(".reslt_item_head").filter(function(){       //title
+				var data_title = $(this).text().trim();
+				data_title = data_title.replace("/","");
+				json.title = data_title;
+			})
+			$(".img_reslt").filter(function(){       //image
+				var data_img = $(this).find("#Any_10").attr("src");
+				json.img = data_img;
+			})
+
+			$(".bibViewTable").filter(function(){        //author, isbn, year, publisher
+					var data_author="", data_isbn="", data_year="", data_publisher="";
+					for(var i = 0 ; i<20;i++){
+						var str="#For_"+i+">th";
+						var ss =$(this).find(str).text().trim();
+							if(ss == "作者:") 	
+								data_author = $(this).find("#For_"+i+">td").text().trim();
+							else if(ss == "ISBN:")
+								data_isbn = $(this).find("#For_"+i+">td").text().trim();
+							else if(ss == "出版年:")
+								data_year = $(this).find("#For_"+i+">td").text().trim();
+							else if(ss == "出版者:")
+								data_publisher = $(this).find("#For_"+i+">td").text().trim();
+					}
+					data_isbn = data_isbn.replace("平裝", "");
+
+					json.author = data_author;
+					json.isbn = data_isbn;
+					json.publish_year = data_year;
+					json.publisher = data_publisher;
+					json.link = searchUrl;
+					json.xinpei_lib = count_book;
+					json.searchState = "true";
+				
+			})
+
+					admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/search_result').push(json);
+		})
+		.catch(reason => {
+			event.data.ref.parent.child('searchState').set(reason);
+		});
+		
+		return Promise.all([searchrp]);
+	})
+	.then(()=>{
+		return event.data.ref.parent.remove();
+	})
+	
+})
