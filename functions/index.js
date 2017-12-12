@@ -509,3 +509,141 @@ exports.hot_key_info = functions.database.ref('/hot_key/trigger')
 
 	});
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+exports.new_book_url = functions.database.ref('/new_book/trigger')
+	.onDelete(event => {
+
+	event.data.ref.parent.child('search_result').remove();
+	
+	event.data.ref.parent.child('trigger').set('searching');
+
+	var url = "http://webpac.lib.ntpu.edu.tw/newbook_focus.cfm";
+	var options = {
+		    uri: url,
+		    headers: {
+		        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
+				"Accept-Language":"en-US,en;q=0.9",
+				"Connection":"keep-alive"
+		    },
+		    json: true, // Automatically parses the JSON string in the response
+			transform: function(body){
+				// use decodeEntities to prevent wrong chinese
+				return cheerio.load(body,{decodeEntities: false});
+			}
+		};
+	const newrp = rp(options).then(function($){
+		var json = {};
+		$(".bookDetail").each(function(){
+			var data_title = $(this).find(".title").text().trim();
+			var data_author = $(this).find(".author").text().trim();
+			var links = $(this).find(".title>a").attr("href");
+			var img = "http://webpac.lib.ntpu.edu.tw/"+ $(this).find("img").attr("src");
+			if(data_title!=""){
+				json.link = "http://webpac.lib.ntpu.edu.tw/"+links;
+				json.image = img;
+				json.title = data_title;
+				json.author = data_author;
+				json.location = "ntpu_lib";
+				event.data.ref.parent.child('temp_result').push(json);
+			}
+		})
+
+	})
+	.catch(reason => {
+		console.log(reason);
+	});
+	
+	return Promise.all([newrp]).then(()=>{
+		event.data.ref.parent.child('searchState').set('info_search');	
+	})
+})
+///////////////////////////////////////////////////////////////////////////
+exports.new_book_info = functions.database.ref('/new_book/temp_result/{pushId}/link')
+	.onCreate(event => {
+
+	admin.database().ref('/new_book/searchState').set('search_info');
+
+	var url = event.data.val();
+	var options = {
+		    uri: url,
+		    headers: {
+		        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
+				"Accept-Language":"en-US,en;q=0.9",
+				"Connection":"keep-alive"
+		    },
+		    json: true, // Automatically parses the JSON string in the response
+			transform: function(body){
+				// use decodeEntities to prevent wrong chinese
+				return cheerio.load(body,{decodeEntities: false});
+			}
+		};
+		const newrp = rp(options).then(function($){
+
+		var title = $(".info").first().find("h2").text().trim();
+
+		var author = $(".info").find("p").html().split("<br>")[0].trim();
+		author = author.replace('作者 :','');
+
+		var publisher = $(".info").find("p").html().split("<br>")[1].trim();
+		publisher = publisher.replace('出版社 :','');
+
+		var publish_year = $(".info").find("p").html().split("<br>")[2].trim();
+		publish_year = publish_year.replace("出版年 : ",'');
+
+		var image = "http://webpac.lib.ntpu.edu.tw/" + $(".photo").find("img").attr("src");
+
+		var links = url;
+
+		var ISBN_tag = false;
+		var ISBN = $(".info_box").find("p").html().split("<br>");
+		for(var key in ISBN)
+		{
+			var text = ISBN[key].trim();
+			if(!text.search("ISBN") && ISBN_tag==false)
+			{
+				//deal with some word behind isbn by split the space
+				var first_ISBN = text.replace("ISBN ： ","");
+				first_ISBN = first_ISBN.split(" ",1);
+				//console.log(first_ISBN);
+				ISBN_tag=true;
+				break;
+			}
+		}
+			var true_isbn = first_ISBN[0];
+			// deal with chinese without space
+			if(true_isbn.search("平裝"))
+				true_isbn = true_isbn.replace("平裝","");
+
+			var count=0;
+			$("tbody").each(function(){
+				var text = $(this).text().trim();
+							
+				if(text.search("Available")>0){
+					count++;
+				}
+			})
+				
+			count = count+"";
+			var jsons = {
+					"isbn":true_isbn,
+					"title":title,
+					"author":author,
+					"img":image,
+					"publish_year":publish_year,
+					"publisher":publisher,
+					"link":links,
+					"storage":count,
+					"location":"ntpu_lib",
+					"searchState":"true"
+					};
+			admin.database().ref('/new_book/search_result').push(jsons);
+	})
+	.catch(reason => {
+		console.log(reason);
+	});
+	
+	return Promise.all([newrp]).then(()=>{
+		event.data.ref.parent.remove();
+		admin.database().ref('/new_book/searchState').set('Finish');
+		admin.database().ref('/new_book/trigger').set('DeleteMe_to_search');
+	})
+})

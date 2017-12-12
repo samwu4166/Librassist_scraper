@@ -85,9 +85,8 @@ function Xinpei(){
 	})
 	
 }
-Xinpei();
-function Key(){	
-	var url = "http://www.books.com.tw/web/books/?loc=menu_1_001", keywords;
+function new_book(){	
+	var url = "http://webpac.lib.ntpu.edu.tw/newbook_focus.cfm";
 	var options = {
 		    uri: url,
 		    headers: {
@@ -101,31 +100,33 @@ function Key(){
 				return cheerio.load(body,{decodeEntities: false});
 			}
 		};
-	const keyrp = rp(options).then(function($){
-		var json = { keyword:"" };
-		$(".clearfix>li>a").filter(function(){
-			var k = $(this).text().trim();
-			if(k!=""){
-				keywords = k;
-//				console.log(keywords);				
-				json.keyword = keywords;
+	const newrp = rp(options).then(function($){
+		var json = {};
+		$(".bookDetail").each(function(){
+			var data_title = $(this).find(".title").text().trim();
+			var data_author = $(this).find(".author").text().trim();
+			var links = $(this).find(".title>a").attr("href");
+			var img = "http://webpac.lib.ntpu.edu.tw/"+ $(this).find("img").attr("src");
+			if(data_title!=""){
+				json.link = "http://webpac.lib.ntpu.edu.tw/"+links;
+				json.image = img;
+				json.title = data_title;
+				json.author = data_author;
+				json.location = "ntpu_lib";
 				console.log(json);
 			}
 		})
 
 	})
 	.catch(reason => {
-		console.log("");
 		console.log(reason);
 	});
 	
-	Promise.all([keyrp]).then(()=>{
+	return Promise.all([newrp]).then(()=>{
 		console.log("finish");
 	})
 }
-//
-var a = 1;
-console.log(typeof (a+""));
+new_book();
 function test_for_url_scrape()
 {
 	request("http://webpac.lib.ntpu.edu.tw/content.cfm?mid=153578&m=ss&k0=java&t0=k&c0=and&list_num=40&current_page=1&mt=&at=&sj=&py=&it=&lr=&lg=&si=6",function(err,resp,html){    //get 用qs來傳送參數
