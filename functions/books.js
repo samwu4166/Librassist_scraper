@@ -29,9 +29,6 @@ var db = firebase.database();
 //ref.update({"nickname":"Handsome"});
 
 function Xinpei(){
-
-
-
 	var options = {
 			    uri: 'http://webpac.tphcc.gov.tw/toread/opac/search?',
 			    qs: {
@@ -87,7 +84,46 @@ function Xinpei(){
 	})
 	
 }
-Xinpei();
+	
+function Key(){	
+	var url = "http://www.books.com.tw/web/books/?loc=menu_1_001", keywords;
+	var options = {
+		    uri: url,
+		    headers: {
+		        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
+				"Accept-Language":"en-US,en;q=0.9",
+				"Connection":"keep-alive"
+		    },
+		    json: true, // Automatically parses the JSON string in the response
+			transform: function(body){
+				// use decodeEntities to prevent wrong chinese
+				return cheerio.load(body,{decodeEntities: false});
+			}
+		};
+	const keyrp = rp(options).then(function($){
+		var json = { keyword:"" };
+		$(".clearfix>li>a").filter(function(){
+			var k = $(this).text().trim();
+			if(k!=""){
+				keywords = k;
+//				console.log(keywords);				
+				json.keyword = keywords;
+				console.log(json);
+			}
+		})
+
+	})
+	.catch(reason => {
+		console.log("");
+		console.log(reason);
+	});
+	
+	Promise.all([keyrp]).then(()=>{
+		console.log("finish");
+	})
+}
+//
+Key();
 function test_for_url_scrape()
 {
 	request("http://webpac.lib.ntpu.edu.tw/content.cfm?mid=153578&m=ss&k0=java&t0=k&c0=and&list_num=40&current_page=1&mt=&at=&sj=&py=&it=&lr=&lg=&si=6",function(err,resp,html){    //get 用qs來傳送參數

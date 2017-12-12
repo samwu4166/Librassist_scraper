@@ -27,7 +27,7 @@ const rp2 = require("request-promise");
 const admin = require('firebase-admin');
 admin.initializeApp(functions.config().firebase);
 // [END import]
-
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{time}/temp_search_ntpu/{pushId}/link')
     .onCreate(event => {
    
@@ -146,7 +146,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{t
     });
 // [END searchkey]
 // [END all]
-
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{time}/key')
     .onCreate(event => {
 
@@ -209,14 +209,14 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{ti
 			return Promise.all([searchrp]).then(()=>{
 					console.log("Scrape "+key+" success");
 					//event.data.ref.parent.child('key').remove();
-					return event.data.ref.parent.child('ntpu_url').set('true');;
+					return event.data.ref.parent.child('ntpu_url').set('true');
 			})
 			.catch(reason => {
-				console.log(reason);
+				admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/isFinish').push(reason);
 			});
     	
     });
-
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}/temp_result_ntpu/{pushId}/refresh')
 	.onUpdate(event => {
 			const uid = event.params.userId;
@@ -308,8 +308,7 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}
 			})
 		})
 	});
-
-
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{time}/key')
     .onCreate(event => {
 
@@ -372,9 +371,12 @@ exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{
 					console.log("(sinpei)Scrape "+key+" success");
 					return event.data.ref.parent.child('Xinpei_url').set("true");
 			})
+			.catch(reason => {
+				admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/isFinish').push(reason);
+			})
     	
     });
-
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/{time}/temp_result_Xinpei/{pushId}/link')
     .onCreate(event => {
     const searchUrl = event.data.val();
@@ -452,3 +454,46 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
 	})
 	
 })
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+exports.hot_key_info = functions.database.ref('/hot_key/trigger')
+	.onWrite(event => {
+		var url = "http://www.books.com.tw/web/books/?loc=menu_1_001", keywords;
+
+		event.data.ref.parent.child('result').remove();
+		event.data.ref.parent.child('isFinish').set('false');
+		var options = {
+			    uri: url,
+			    headers: {
+			        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
+					"Accept-Language":"en-US,en;q=0.9",
+					"Connection":"keep-alive"
+			    },
+			    json: true, // Automatically parses the JSON string in the response
+				transform: function(body){
+					// use decodeEntities to prevent wrong chinese
+					return cheerio.load(body,{decodeEntities: false});
+				}
+			};
+		const keyrp = rp(options).then(function($){
+			var json = { keyword:"" };
+			$(".clearfix>li>a").filter(function(){
+				var k = $(this).text().trim();
+				if(k!=""){
+					keywords = k;
+					json.keyword = keywords;
+					event.data.ref.parent.child('result').push(json);
+				}
+			})
+
+		})
+		.catch(reason => {
+			console.log(reason);
+		});
+		
+		return Promise.all([keyrp]).then(()=>{
+			event.data.ref.parent.child('isFinish').set('true');
+		})
+
+	});
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
