@@ -84,7 +84,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{t
 				}
 
 				var links = searchUrl;
-
+				var true_isbn = "";
 				var ISBN_tag = false;
 				var ISBN = $(".info_box").find("p").html().split("<br>");
 				for(var key in ISBN)
@@ -95,17 +95,19 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{t
 						//deal with some word behind isbn by split the space
 						var first_ISBN = text.replace("ISBN ： ","");
 						first_ISBN = first_ISBN.split(" ",1);
+						true_isbn = first_ISBN[0];
 						//console.log(first_ISBN);
 						ISBN_tag=true;
 						break;
 					}
 				}
-				var true_isbn = first_ISBN[0];
+				
 				// deal with chinese without space
 				
 				true_isbn = true_isbn.replace("平裝","");
 				true_isbn = true_isbn.replace("精裝","");
 				true_isbn = true_isbn.replace("()","");
+				true_isbn = true_isbn.replace(":","");
 
 				
 				var count=0;
@@ -116,24 +118,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{t
 						count++;
 					}
 				})
-				/*	Abandaned
-				var Bookjson = {
-						[true_isbn]:
-							{
-								"title":title,
-								"author":author,
-								"img":image,
-								"publish_year":publish_year,
-								"publisher":publisher,
-								"link":links,
-								"lib":{ntpu:count},
-								"trivial":{
-									isFinish:"true",
-									refresh:"false"
-								},
-							}
-						};
-						*/
+			
 				//set the json
 				count = count+"";
 				jsons = {
@@ -174,6 +159,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{ti
 
     	const uid = event.params.userId;
     	const local_time = event.params.time;
+    	var counter = 0;
     	console.log("uid is "+uid);
     	const root = event.data.ref.root;
     
@@ -187,7 +173,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{ti
 				        k0:key,
 				        t0:"k",
 				        c0:"and",
-				        list_num:"20",
+				        list_num:"25",
 				        current_page:"1",
 				    },
 				    headers: {
@@ -205,7 +191,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{ti
 						var title;
 						var	author;
 					
-						var json = {title:"",author:"",link:"",refresh:"false",img:"",searchState:"",location:""};
+						var json = {title:"",author:"",link:"",refresh:"false",img:"",searchState:"",location:"",storage:"",publish_year:"",publisher:"",isbn:""};
 						$(".list_box").filter(function(){
 								var data_title = $(this).children().find("li>a").text().trim();
 								var data_author = $(this).children().find(".product_info_content>p").first().text().trim();
@@ -221,7 +207,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{ti
 									json.location = "ntpu_lib";
 									json.searchState = "false";
 									admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/temp_search_ntpu').push(json);
-									
+									counter++;
 								}
 						})
 
@@ -232,14 +218,15 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{ti
 			return Promise.all([searchrp]).then(()=>{
 					console.log("Scrape "+key+" success");
 					//event.data.ref.parent.child('key').remove();
-					return event.data.ref.parent.child('ntpu_url').set('true');
+					return event.data.ref.parent.child('ntpu_url').set(counter.toString());
 			})
 			.catch(reason => {
 				admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/isFinish').push(reason);
 			});
     	
     });
-///////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}/temp_search_ntpu/{pushId}/refresh')
 	.onUpdate(event => {
 			const uid = event.params.userId;
@@ -293,6 +280,7 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}
 
 				var links = searchUrl;
 
+				var true_isbn = "";
 				var ISBN_tag = false;
 				var ISBN = $(".info_box").find("p").html().split("<br>");
 				for(var key in ISBN)
@@ -303,15 +291,18 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}
 						//deal with some word behind isbn by split the space
 						var first_ISBN = text.replace("ISBN ： ","");
 						first_ISBN = first_ISBN.split(" ",1);
+						true_isbn = first_ISBN[0];
 						//console.log(first_ISBN);
 						ISBN_tag=true;
 						break;
 					}
 				}
-				var true_isbn = first_ISBN[0];
+
 				// deal with chinese without space
-				if(true_isbn.search("平裝"))
-					true_isbn = true_isbn.replace("平裝","");
+				true_isbn = true_isbn.replace("平裝","");
+				true_isbn = true_isbn.replace("精裝","");
+				true_isbn = true_isbn.replace("()","");
+				true_isbn = true_isbn.replace(":","");
 
 				var count=0;
 				$("tbody").each(function(){
@@ -336,20 +327,21 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}
 						};
 				
 				admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/search_result').push(jsons);
-
+				return event.data.ref.parent.remove();
 			})
 			.catch(function(err){
 				console.log(err);
 				//console.log("too late!");
 			});
 			return Promise.all([refresh_search]).then(()=>{
-					return event.data.ref.parent.remove();
+					console.log("refresh finish");
 			})
 			.catch(reason=>{
 				return event.data.ref.parent.child('searchState').set(err);
 			})
 		})
 	});
+	
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{time}/key')
     .onCreate(event => {
@@ -358,7 +350,7 @@ exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{
     	const local_time = event.params.time;
     	console.log("(sinpei)uid is "+uid);
     	const root = event.data.ref.root;
-    	
+    	var counter = 0;
     	const key = event.data.val();
     	event.data.ref.parent.child('Xinpei_url').set("false");
     	var options = {
@@ -382,7 +374,7 @@ exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{
 				};
  				const searchrp = rp(options)
 				.then(function($){
-					var json = {title:"",author:"",location:"",link:"",img:"",searchState:"",xinpei_lib:""};
+					var json = {title:"",author:"",location:"",link:"",img:"",searchState:"",storage:"",isbn:"",publish_year:"",publisher:""};
 					var cn = -1;
 					var cnn="";
 					$(".is_img").filter(function(){
@@ -406,11 +398,12 @@ exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{
 						json.author = data_author;
 						json.location = "ntc_lib";
 						json.link = "http://webpac.tphcc.gov.tw"+links;
-						json.xinpei_lib = data_count;
+						json.storage = data_count;
 						json.img = image;
 						json.searchState = "false";
 
 						event.data.ref.parent.child('temp_result_Xinpei').push(json);
+						counter++;
 					})
 					
 
@@ -420,7 +413,7 @@ exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{
 				});
 			return Promise.all([searchrp]).then(()=>{
 					console.log("(inpei)Scrape "+key+" success");
-					return event.data.ref.parent.child('Xinpei_url').set("true");
+					return event.data.ref.parent.child('Xinpei_url').set(counter.toString());
 			})
 			.catch(reason => {
 				admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/isFinish').push(reason);
@@ -433,7 +426,7 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
     const searchUrl = event.data.val();
 	const uid = event.params.userId;
 	const local_time = event.params.time;
-	const pr1 = event.data.ref.parent.child('xinpei_lib').once('value');
+	const pr1 = event.data.ref.parent.child('storage').once('value');
 	const root = event.data.ref.root;
 	event.data.ref.parent.child('searchState').set("Pending!");
 	return Promise.all([pr1]).then( results => {
@@ -454,18 +447,7 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
 			};
 		const searchrp = rp(options).then(function($){
 			var title, author, isbn, year, publisher, img;
-			var json = {		
-								"isbn":"",
-								"title":"",
-								"author":"",
-								"img":"",
-								"publish_year":"",
-								"publisher":"",
-								"link":"",
-								"storage":"",
-								"location":"",
-								"searchState":""
-							};
+			var json = {title:"",author:"",location:"",link:"",img:"",searchState:"",storage:"",isbn:"",publish_year:"",publisher:""};
 			
 			$(".reslt_item_head").filter(function(){       //title
 				var data_title = $(this).text().trim();
@@ -482,35 +464,52 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
 			})
 
 			$(".bibViewTable").filter(function(){        //author, isbn, year, publisher
-					var data_author="", data_isbn="", data_year="", data_publisher="";
-					for(var i = 0 ; i<20;i++){
-						var str="#For_"+i+">th";
-						var ss =$(this).find(str).text().trim();
-							if(ss == "作者:") 	
-								data_author = $(this).find("#For_"+i+">td").text().trim();
-							else if(ss == "ISBN:")
-								data_isbn = $(this).find("#For_"+i+">td").text().trim();
-							else if(ss == "出版年:")
-								data_year = $(this).find("#For_"+i+">td").text().trim();
-							else if(ss == "出版者:")
-								data_publisher = $(this).find("#For_"+i+">td").text().trim();
+				var data_author="", data_isbn="", data_year="", data_publisher="";
+				for(var i = 0 ; i<20;i++){
+					var str="#For_"+i+">th";
+					var ss =$(this).find(str).text().trim();
+						if(ss.search("作者:")>=0) 	
+							data_author = $(this).find("#For_"+i+">td").text().trim();
+						else if(ss == "ISBN:")
+							data_isbn = $(this).find("#For_"+i+">td").text().trim();
+						else if(ss == "出版年:")
+							data_year = $(this).find("#For_"+i+">td").text().trim();
+						else if(ss == "出版者:")
+							data_publisher = $(this).find("#For_"+i+">td").text().trim();
+				}
+				if(data_year=="")
+				{
+					if(data_publisher.search(",")>=0){
+						data_publisher = data_publisher.split(",",2);
+						data_year = data_publisher[1];
+						data_publisher = data_publisher[0];
 					}
-					data_isbn = data_isbn.replace("平裝", "");
-					data_isbn = data_isbn.replace("精裝", "");
-					data_isbn = data_isbn.replace("()", "");
+					else if(data_publisher.search(";")>=0)
+					{
+						data_publisher = data_publisher.split(";",2);
+						data_year = data_publisher[1];
+						data_publisher = data_publisher[0];
+					}
+				}
+				
+				data_publisher = data_publisher.replace(";",'');
+				data_isbn = data_isbn.replace("平裝", "");
+				data_isbn = data_isbn.replace("精裝", "");
+				data_isbn = data_isbn.replace("()", "");
+				data_isbn = data_isbn.replace(":", "");
 
-					json.location = "ntc_lib";
-					json.author = data_author;
-					json.isbn = data_isbn;
-					json.publish_year = data_year;
-					json.publisher = data_publisher;
-					json.link = searchUrl;
-					json.storage = count_book;
-					json.searchState = "true";
+				json.author = data_author;
+				json.isbn = data_isbn;
+				json.publish_year = data_year;
+				json.publisher = data_publisher;
+				json.link = searchUrl;
+				json.searchState = "true";
+				json.storage = count_book;
+				json.location = "ntc_lib";
+				admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/search_result').push(json);
 				
 			})
-
-					admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/search_result').push(json);
+					
 		})
 		.catch(reason => {
 			event.data.ref.parent.child('searchState').set(reason);
