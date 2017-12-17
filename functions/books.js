@@ -135,7 +135,7 @@ function Xinpei_url(){
 					return cheerio.load(body,{decodeEntities: false});
 				}
 			};
-	var prArray = [];
+	
 	const pr = rp(options)
 	.then(function($){
 		var title;
@@ -162,26 +162,27 @@ function Xinpei_url(){
 					image = "http://webpac.tphcc.gov.tw/toread/images/macheteicons/book.gif";
 				}
 				
+
+				
 				data_title = data_title.replace("/","");
 				json.title = data_title;
 				json.img = image;
 				json.author = data_author;
 				json.xinpei_lib = data_count;
 				json.link = "http://webpac.tphcc.gov.tw"+links;
-				const unit = db.ref('/test/result/'+links+"/").update(json);
-				prArray.push(unit);
+				
 				counter++;
 		})
 	})
 	.catch(reason =>{
 		console.log(reason);
 	})
-	return Promise.all([pr,prArray]).then(()=>{
+	return Promise.all([pr]).then(()=>{
 		console.log(counter);
 	})
 	
 }
-//Xinpei_url();
+Xinpei_url();
 function new_book(){	
 	var url = "http://webpac.lib.ntpu.edu.tw/newbook_focus.cfm";
 	var options = {
@@ -226,7 +227,7 @@ function new_book(){
 //new_book();
 function test_for_url_scrape()
 {
-	request("http://webpac.lib.ntpu.edu.tw/search.cfm?m=ss&k0=pipeline&t0=k&c0=and&mt=&at=&sj=&py=&it=&lr=&lg=&list_num=25&current_page=1&si=6",function(err,resp,html){    //get 用qs來傳送參數
+	request("http://webpac.lib.ntpu.edu.tw/content.cfm?mid=153578&m=ss&k0=java&t0=k&c0=and&list_num=10&current_page=1&mt=&at=&sj=&py=&it=&lr=&lg=&si=6",function(err,resp,html){    //get 用qs來傳送參數
 		if(html!=""){
 			console.log("html load success\n");
 			var $ = cheerio.load(html,{decodeEntities: false});
@@ -273,7 +274,39 @@ function test_for_url_scrape()
 									count++;
 								}
 							})
-
+							const imagerp = new Promise(function(resolve,reject){
+								setTimeout(function(){
+									var options = {
+											    uri: image,
+											    json: true, // Automatically parses the JSON string in the response
+												transform: function(body){
+													return cheerio.load(body);
+												}
+											};
+									rp(options)
+									.then(function($){
+											var real = $("img").attr("src");
+											if(real == image)
+											{
+												resolve("true");
+											}
+											else
+											{
+												reject("false");
+											}		
+									})
+									.catch(reason => {
+										reject(reason);
+									})
+								}, 1500);
+							})
+							imagerp.then(msg =>
+							{
+								console.log("good");
+							})
+							.catch(reason => {
+								image = "";
+							})
 
 							var Bookjson = {
 								[true_isbn]:
@@ -299,7 +332,7 @@ function test_for_url_scrape()
 		//console.log(html);
 	});
 }
-
+test_for_url_scrape();
 
 function test_cloud_prepared(keyvalue,page)
 {
@@ -447,7 +480,7 @@ function test_cloud_prepared(keyvalue,page)
 		})
 		return console.log("end of scrape");
 }
-test_cloud_prepared("pipeline","1");
+//test_cloud_prepared("pipeline","1");
 function test_for_search_url(){
 
     var links=[];
@@ -516,55 +549,3 @@ function test_for_search_url(){
 function sleep(ms) {
   			return new Promise(resolve => setTimeout(resolve, ms));
 		}
-var testJson = {
-	"00000001":
-	{
-		"lib":
-		{
-			"sinpei":"1"
-		}
-	}
-}
-var testJson2 = {
-	"00000001":
-	{
-		"lib":
-		{
-			"taipei":"1"
-		}
-	}
-}
-
-var testJson3 = {
-	"00000002":
-	{
-		"lib":
-		{
-			"ntpu":"1"
-		}
-	}
-}
-const isbn = "00000002";
-
-/*   // this code is detect that if isbn in search_result is exist or not (unapply)
-db.ref('/search_result_test/'+isbn+'/').once('value')
-.then(function(snap){
-	var a = snap.exists();
-	if(a)
-	{
-		var value = snap.child('lib').val();
-		
-		value.ntpu = "0";
-		var json = {"lib":value};
-		console.log(json);
-		db.ref('search_result_test/'+isbn+'/').update(json);
-		console.log("exist!");
-	}
-	else
-	{
-		db.ref('search_result_test/').update(testJson3);
-		console.log("create new one");
-	}
-})
-*/
-//console.log(testJson);

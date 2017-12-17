@@ -545,13 +545,13 @@ exports.hot_key_info = functions.database.ref('/hot_key/trigger')
 				}
 			};
 		const keyrp = rp(options).then(function($){
-			var json = { keyword:"" };
+			
 			$(".clearfix>li>a").filter(function(){
 				var k = $(this).text().trim();
 				if(k!=""){
 					keywords = k;
-					json.keyword = keywords;
-					event.data.ref.parent.child('result').push(json);
+					var json = {[keywords]:keywords};
+					event.data.ref.parent.child('result').update(json);
 				}
 			})
 
