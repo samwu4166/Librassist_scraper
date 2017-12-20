@@ -23,6 +23,7 @@ const request = require("request");
 const cheerio = require("cheerio");
 const rp = require("request-promise");
 const rp2 = require("request-promise");
+const ph = require("phantom");
 // The Firebase Admin SDK to access the Firebase Realtime Database. 
 const admin = require('firebase-admin');
 admin.initializeApp(functions.config().firebase);

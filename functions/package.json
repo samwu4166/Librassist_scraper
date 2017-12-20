@@ -8,7 +8,7 @@
     "firebase-admin": "latest",
     "firebase-functions": "latest",
     "mocha": "latest",
-    "phantom": "latest",
+    "phantom": "^4.0.11",
     "request": "latest",
     "request-promise": "latest",
     "sinon": "latest"
