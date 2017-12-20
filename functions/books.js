@@ -6,27 +6,6 @@ var rp2 = require("request-promise");
 // The Cloud Functions for Firebase SDK to create Cloud Functions and setup triggers.
 // The Firebase Admin SDK to access the Firebase Realtime Database. 
 
-var config = {
-    apiKey: "AIzaSyDzHx_01EmnGkXsHmQKDMh4rA9GYCJzdkk",
-    authDomain: "librarytest-16eb2.firebaseapp.com",
-    databaseURL: "https://librarytest-16eb2.firebaseio.com",
-    projectId: "librarytest-16eb2",
-    storageBucket: "librarytest-16eb2.appspot.com",
-    messagingSenderId: "923330716692"
-  };
-  var config2 = {
-  	apiKey: "AIzaSyDKpeNxuQZhPWP6AQd9uphsi775aIfhirU",
-    authDomain: "librassist-ea4a3.firebaseapp.com",
-    databaseURL: "https://librassist-ea4a3.firebaseio.com",
-    projectId: "librassist-ea4a3",
-    storageBucket: "librassist-ea4a3.appspot.com",
-    messagingSenderId: "720700750764"
-  }
- firebase.initializeApp(config);
-
-var db = firebase.database();
-
-//ref.update({"nickname":"Handsome"});
 	
 function Xinpei(searchUrl){	
 	var options = {
@@ -112,8 +91,6 @@ function Xinpei(searchUrl){
 		console.log("finish");
 	})
 }
-//以下是拿三本書作範例
-//Xinpei("http://webpac.tphcc.gov.tw/toread/opac/bibliographic_view/702097?location=0&amp;mps=20&amp;ob=desc&amp;q=app&amp;sb=relevance&amp;start=0&amp;view=CONTENT");
 function Xinpei_url(){
 	var counter = 0;
 	var options = {
@@ -182,7 +159,6 @@ function Xinpei_url(){
 	})
 	
 }
-Xinpei_url();
 function new_book(){	
 	var url = "http://webpac.lib.ntpu.edu.tw/newbook_focus.cfm";
 	var options = {
@@ -224,7 +200,6 @@ function new_book(){
 		console.log("finish");
 	})
 }
-//new_book();
 function test_for_url_scrape()
 {
 	request("http://webpac.lib.ntpu.edu.tw/content.cfm?mid=153578&m=ss&k0=java&t0=k&c0=and&list_num=10&current_page=1&mt=&at=&sj=&py=&it=&lr=&lg=&si=6",function(err,resp,html){    //get 用qs來傳送參數
@@ -332,7 +307,6 @@ function test_for_url_scrape()
 		//console.log(html);
 	});
 }
-test_for_url_scrape();
 
 function test_cloud_prepared(keyvalue,page)
 {
@@ -480,7 +454,6 @@ function test_cloud_prepared(keyvalue,page)
 		})
 		return console.log("end of scrape");
 }
-//test_cloud_prepared("pipeline","1");
 function test_for_search_url(){
 
     var links=[];
@@ -539,13 +512,8 @@ function test_for_search_url(){
 			.catch(function(err){
 				console.log(err);
 			});
-		
-      // You must return a Promise when performing asynchronous tasks inside a Functions such as
-      // writing to the Firebase Realtime Database.
-      // Setting an "uppercase" sibling in the Realtime Database returns a Promise.
-      //db.ref('/isFinish').set("pending");
+	
 }
-//test_for_search_url();
 function sleep(ms) {
   			return new Promise(resolve => setTimeout(resolve, ms));
 		}

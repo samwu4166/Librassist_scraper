@@ -23,7 +23,7 @@ const request = require("request");
 const cheerio = require("cheerio");
 const rp = require("request-promise");
 const rp2 = require("request-promise");
-const ph = require("phantom");
+const phantom = require("phantom");
 // The Firebase Admin SDK to access the Firebase Realtime Database. 
 const admin = require('firebase-admin');
 admin.initializeApp(functions.config().firebase);
@@ -705,4 +705,73 @@ exports.new_book_info = functions.database.ref('/new_book/temp_result/{pushId}/l
 		admin.database().ref('/new_book/searchState').set('Finish');
 		admin.database().ref('/new_book/trigger').set('DeleteMe_to_search');
 	})
+})
+exports.ntpu_sign = functions.database.ref('/test_sign/account/{userId}/key')
+.onCreate(event =>{
+
+	const uid = event.params.userId;
+	const pr1 = event.data.ref.parent.child('account').once('value');
+	const pr2 = event.data.ref.parent.child('password').once('value');
+	console.log("start fetching username and password from "+uid+"....")
+	var instance, _page;
+	return Promise.all([pr1,pr2]).then(results =>{
+		console.log("fething success!")
+		const username = results[0].val()
+		const password = results[1].val()
+		console.log("user is "+username);
+		const pr = 
+		  phantom
+		  .create()
+		  .then(ph => {
+		    instance = ph
+		    return instance.createPage()
+		  })
+		  .then(page => {
+		  	console.log("create page success")
+		    _page = page
+		    _page.setting('userAgent', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36")
+		    _page.on('onConsoleMessage', true, function(msg) {
+		        console.log('msg: ' + msg)
+		    })
+		    return _page.open('http://webpac.library.ntpu.edu.tw/Webpac2/Person.dll/')
+		  })
+		  .then(status => {
+		    return new Promise(function (resolve, reject) {
+		      _page.on('onAlert', function (msg) {
+		        reject(msg)
+		      })
+		      _page.on('onLoadFinished', function (status) {
+		        resolve(status)
+		      })
+		      console.log("prepare to submit");
+		      _page.evaluate(function (name,pass) {
+		      		
+		        	document.querySelector("input[name='RNO']").value = name;
+		        	document.querySelector("input[name='PWD']").value = pass;
+		        	document.querySelector("form[name='CODE']").submit();
+					
+			      },username,password);
+			    })
+			  })
+			  .then((p)=> {
+			    console.log(username+": log success!")
+			    const off = _page.off('onLoadFinished');
+			    return Promise.all([off])
+			  })
+			  .then(()=> {
+			    instance.exit()
+			  })
+			  .catch(e => {
+			    console.log(username+"login Failed! " + e)
+			    const off = _page.off('onLoadFinished');
+			    return Promise.all([off]).then(()=>{
+			      instance.exit()
+			    })
+			  });
+			 
+			return Promise.all([pr]).then(()=>{
+				  	return event.data.ref.parent.child('key').remove();
+				  })
+	})
+
 })
