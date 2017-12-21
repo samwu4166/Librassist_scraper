@@ -527,45 +527,46 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 exports.hot_key_info = functions.database.ref('/hot_key/trigger')
 	.onDelete(event => {
-		var url = "http://www.books.com.tw/web/books/?loc=menu_1_001", keywords;
-
-		event.data.ref.parent.child('result').remove();
-		event.data.ref.parent.child('isFinish').set('false');
-		event.data.ref.parent.child('trigger').set('searching');
-		var options = {
-			    uri: url,
+	
+	event.data.ref.parent.child('result').remove();
+	event.data.ref.parent.child('isFinish').set('false');
+	event.data.ref.parent.child('trigger').set('searching');
+	var options = {
+			    uri: 'http://book.tpml.edu.tw/webpac/webpacIndex.jsp',
 			    headers: {
 			        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
 					"Accept-Language":"en-US,en;q=0.9",
+					"Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
 					"Connection":"keep-alive"
 			    },
 			    json: true, // Automatically parses the JSON string in the response
 				transform: function(body){
-					// use decodeEntities to prevent wrong chinese
-					return cheerio.load(body,{decodeEntities: false});
+					return cheerio.load(body);
 				}
 			};
-		const keyrp = rp(options).then(function($){
-			
-			$(".clearfix>li>a").filter(function(){
-				var k = $(this).text().trim();
-				if(k!=""){
-					keywords = k;
-					var json = {[keywords]:keywords};
-					event.data.ref.parent.child('result').update(json);
-				}
+	const pr = 	rp(options)
+			.then(function($){
+					var title;
+					var json = {};
+					 $('.tagCloud > ul > li').each(function () {
+		            	var key = $(this).text().trim()
+		            	var json = {[key]:key};
+		            	event.data.ref.parent.child('result').update(json);
+		            	//console.log(json);
+		          });
+				
 			})
+			.then(()=>{
+				event.data.ref.parent.child('isFinish').set("true");
+			})
+			.catch(function(err){
+				console.log(err);
+			});
 
-		})
-		.catch(reason => {
-			console.log(reason);
-		});
-		
-		return Promise.all([keyrp]).then(()=>{
+		return Promise.all([pr]).then(()=>{
 			event.data.ref.parent.child('trigger').set('deleteMe');
-			event.data.ref.parent.child('isFinish').set('true');
+			console.log("finish");
 		})
-
 	});
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 exports.new_book_url = functions.database.ref('/new_book/trigger')
@@ -779,6 +780,310 @@ exports.ntpu_sign = functions.database.ref('/user_data/{userId}/library_account/
 
 				  	return event.data.ref.parent.child('key').remove();
 				  })
+	})
+
+})
+
+exports.ntc_sign = functions.database.ref('/user_data/{userId}/library_account/ntc_lib/key')
+
+.onCreate(event =>{
+
+    
+
+	event.data.ref.parent.child('State').set('initialize')
+
+	const uid = event.params.userId;
+
+	const pr1 = event.data.ref.parent.child('account').once('value');
+
+	const pr2 = event.data.ref.parent.child('password').once('value');
+
+	console.log("start fetching username and password from "+uid+"....")
+
+	var instance, _page;
+
+	return Promise.all([pr1,pr2]).then(results =>{
+
+		event.data.ref.parent.child('State').set('pending')
+
+		console.log("fething success!")
+
+		const username = results[0].val()
+
+		const password = results[1].val()
+
+		console.log("user is "+username);
+
+		const pr = 
+
+		  phantom
+
+		  .create()
+
+		  .then(ph => {
+
+		    instance = ph
+
+		    return instance.createPage()
+
+		  })
+
+		  .then(page => {
+
+		  	console.log("create page success")
+
+		    _page = page
+
+		    _page.setting('userAgent', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36")
+
+		    _page.on('onConsoleMessage', true, function(msg) {
+
+		        console.log('msg: ' + msg)
+
+		    })
+
+		    return _page.open('http://www.library.ntpc.gov.tw/loginControl/')
+
+		  })
+
+		  .then(status => {
+
+        return new Promise(function (resolve, reject) {
+
+          _page.on('onUrlChanged', function (url) {
+          	if (url == 'http://www.library.ntpc.gov.tw/') {
+				resolve(url)
+          	}
+          })
+
+          _page.evaluate(function (name,pass) {
+
+
+
+            document.querySelector("input[id='loginUsername']").value = name
+
+            document.querySelector("input[id='loginPassword']").value = pass
+
+            document.querySelector("input[name='codenumber']").value = document.querySelector("input[id='codeVal']").value
+
+
+
+          },username,password)
+
+          .then(()=> {
+
+            _page.sendEvent('keydown', 16777217, null, null)
+            _page.sendEvent('keydown', 16777217, null, null)
+            _page.sendEvent('keydown', 16777217, null, null)
+            _page.sendEvent('keydown', 16777217, null, null)
+            _page.sendEvent('keydown', 16777217, null, null)
+            _page.sendEvent('keydown', 16777217, null, null)
+            _page.sendEvent('keydown', 16777217, null, null)
+
+            _page.sendEvent('keydown', 16777221, null, null)
+
+            return new Promise(resolve => setTimeout(resolve, 20000))
+
+          })
+
+          .then((p)=> {
+
+            reject("timeout")
+
+          })
+
+        })
+
+      })
+
+      .then((p)=> {
+
+        console.log(username+": log success!")
+
+        const off = _page.off('onUrlChanged');
+
+        return Promise.all([off])
+
+      })
+
+      .then(()=> {
+
+        event.data.ref.parent.child('State').set('Finish')
+
+        instance.exit()
+
+      })
+
+      .catch(e => {
+
+        console.log(username+"login Failed! " + e)
+
+        const off = _page.off('onUrlChanged');
+
+        return Promise.all([off]).then(()=>{
+
+          event.data.ref.parent.child('State').set('Error')
+
+          instance.exit()
+
+        })
+
+      });
+
+
+
+      return Promise.all([pr]).then(()=>{
+
+        return event.data.ref.parent.child('key').remove()
+
+      })
+
+    })
+
+})
+
+exports.tc_sign = functions.database.ref('/user_data/{userId}/library_account/tc_lib/key')
+
+.onCreate(event =>{
+
+	
+
+	event.data.ref.parent.child('State').set('initialize')
+
+	const uid = event.params.userId
+
+	const pr1 = event.data.ref.parent.child('account').once('value')
+
+	const pr2 = event.data.ref.parent.child('password').once('value')
+
+	console.log("start fetching username and password from "+uid+"....")
+
+	var instance, _page
+
+	return Promise.all([pr1,pr2]).then(results =>{
+
+		event.data.ref.parent.child('State').set('pending')
+
+		console.log("fething success!")
+
+		const username = results[0].val()
+
+		const password = results[1].val()
+
+		console.log("user is "+username)
+
+		const pr = 
+
+		  phantom
+
+		  .create()
+
+		  .then(ph => {
+
+		    instance = ph
+
+		    return instance.createPage()
+
+		  })
+
+		  .then(page => {
+
+		  	console.log("create page success")
+
+		    _page = page
+
+		    _page.setting('userAgent', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36")
+
+		    _page.on('onConsoleMessage', true, function(msg) {
+
+		        console.log('msg: ' + msg)
+
+		    })
+
+		    return _page.open('http://book.tpml.edu.tw/webpac/webpacIndex.jsp')
+
+		  })
+
+		  .then(status => {
+
+		    return new Promise(function (resolve, reject) {
+
+		      _page.on('onAlert', function (msg) {
+
+		        reject(msg)
+
+		      })
+
+		      _page.on('onLoadFinished', function (status) {
+
+		        resolve(status)
+
+		      })
+
+		      console.log("prepare to submit")
+
+		      _page.evaluate(function (name,pass) {
+
+            
+
+            document.querySelector("form[name='memberlogin']").autocomplete = "on"
+
+            document.querySelector("input[name='account2']").value = name
+
+            document.querySelector("input[name='passwd2']").value = pass
+
+            document.querySelector("form[name='memberlogin']").submit()
+
+					
+
+			      },username,password)
+
+			    })
+
+			  })
+
+			  .then((p)=> {
+
+			    console.log(username+": log success!")
+
+			    const off = _page.off('onLoadFinished')
+
+			    return Promise.all([off])
+
+			  })
+
+			  .then(()=> {
+
+			  	event.data.ref.parent.child('State').set('Finish')
+
+			    instance.exit()
+
+			  })
+
+			  .catch(e => {
+
+			    console.log(username+"login Failed! " + e)
+
+			    const off = _page.off('onLoadFinished')
+
+			    return Promise.all([off]).then(()=>{
+
+						event.data.ref.parent.child('State').set('Error')
+
+			      instance.exit()
+
+			    })
+
+			  })
+
+			 
+
+		return Promise.all([pr]).then(()=>{
+
+			return event.data.ref.parent.child('key').remove()
+
+		})
+
 	})
 
 })
