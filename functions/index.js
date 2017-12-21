@@ -706,15 +706,17 @@ exports.new_book_info = functions.database.ref('/new_book/temp_result/{pushId}/l
 		admin.database().ref('/new_book/trigger').set('DeleteMe_to_search');
 	})
 })
-exports.ntpu_sign = functions.database.ref('/test_sign/account/{userId}/key')
+exports.ntpu_sign = functions.database.ref('/user_data/{userId}/library_account/ntpu_lib/key')
 .onCreate(event =>{
 
+	event.data.ref.parent.child('State').set('initialize');
 	const uid = event.params.userId;
 	const pr1 = event.data.ref.parent.child('account').once('value');
 	const pr2 = event.data.ref.parent.child('password').once('value');
 	console.log("start fetching username and password from "+uid+"....")
 	var instance, _page;
 	return Promise.all([pr1,pr2]).then(results =>{
+		event.data.ref.parent.child('State').set('pending');
 		console.log("fething success!")
 		const username = results[0].val()
 		const password = results[1].val()
@@ -759,17 +761,22 @@ exports.ntpu_sign = functions.database.ref('/test_sign/account/{userId}/key')
 			    return Promise.all([off])
 			  })
 			  .then(()=> {
+			  	event.data.ref.parent.child('State').set('Finish');
 			    instance.exit()
 			  })
 			  .catch(e => {
+			  	//event.data.ref.parent.child('State').set('Error');
 			    console.log(username+"login Failed! " + e)
 			    const off = _page.off('onLoadFinished');
 			    return Promise.all([off]).then(()=>{
+			      event.data.ref.parent.child('State').set('Error');
 			      instance.exit()
+			      
 			    })
 			  });
 			 
 			return Promise.all([pr]).then(()=>{
+
 				  	return event.data.ref.parent.child('key').remove();
 				  })
 	})
