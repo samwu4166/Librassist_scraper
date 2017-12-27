@@ -24,18 +24,21 @@ function Xinpei(searchUrl){
 	const searchrp = rp(options).then(function($){
 		var title, author, isbn, year, publisher, img;
 		var json = {};
-		
+		var havaData = false;
 		$(".reslt_item_head").filter(function(){       //title
+			havaData = true;
 			var data_title = $(this).text().trim();
 			data_title = data_title.replace("/","");
 			json.title = data_title;
 		})
 		$(".img_reslt").filter(function(){       //image
+			havaData = true;
 			var data_img = $(this).find("#Any_10").attr("src");
 			json.img = data_img;
 		})
 
 		$(".bibViewTable").filter(function(){        //author, isbn, year, publisher
+				havaData = true;
 				var data_author="", data_isbn="", data_year="", data_publisher="";
 				for(var i = 0 ; i<20;i++){
 					var str="#For_"+i+">th";
@@ -77,9 +80,14 @@ function Xinpei(searchUrl){
 				json.publisher = data_publisher;
 				json.links = searchUrl;
 				json.searchState = "true";
-				
+
 				console.log(json);
 		})
+		if(!havaData)
+		{
+			console.log("data_author undefined");
+		}
+		
 	})
 	.catch(reason => {
 		console.log("");
