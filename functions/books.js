@@ -78,7 +78,6 @@ function Xinpei(searchUrl){
 				json.links = searchUrl;
 				json.searchState = "true";
 				
-				
 				console.log(json);
 		})
 	})
@@ -92,6 +91,7 @@ function Xinpei(searchUrl){
 	})
 }
 function Xinpei_url(){
+	console.log("start xinpei url")
 	var counter = 0;
 	var options = {
 			    uri: 'http://webpac.tphcc.gov.tw/toread/opac/search?',
@@ -101,6 +101,7 @@ function Xinpei_url(){
 			        view:"CONTENT",
 			        location:"0",
 			    },
+			    timeout:5000,
 			    headers: {
 			        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
 					"Accept-Language":"en-US,en;q=0.9",
@@ -112,9 +113,10 @@ function Xinpei_url(){
 					return cheerio.load(body,{decodeEntities: false});
 				}
 			};
-	
+	var start = Date.now();
 	const pr = rp(options)
 	.then(function($){
+		clearInterval(interval);
 		var title;
 		var	author;
 
@@ -147,18 +149,24 @@ function Xinpei_url(){
 				json.author = data_author;
 				json.xinpei_lib = data_count;
 				json.link = "http://webpac.tphcc.gov.tw"+links;
-				
+				console.log(json);
 				counter++;
 		})
 	})
 	.catch(reason =>{
 		console.log(reason);
 	})
+
+	var interval = setInterval(() => {
+	  console.log("Waiting:",(Date.now() - start) / 1000);
+	}, 1000)
+
 	return Promise.all([pr]).then(()=>{
 		console.log(counter);
 	})
 	
 }
+
 function new_book(){	
 	var url = "http://webpac.lib.ntpu.edu.tw/newbook_focus.cfm";
 	var options = {
@@ -475,10 +483,14 @@ function test_for_search_url(){
 					"Connection":"keep-alive"
 			    },
 			    json: true, // Automatically parses the JSON string in the response
+			    timeout : 3000,
+			    resolveWithFullResponse: true,
 				transform: function(body){
 					return cheerio.load(body);
 				}
 			};
+			
+
 			rp(options)
 			.then(function($){
 					var title;
@@ -551,4 +563,6 @@ function test(){
 				console.log(err);
 			});
 }
-test();
+//Xinpei_url();
+Xinpei("http://webpac.tphcc.gov.tw/toread/opac/bibliographic_view/461884?location=0&mps=50&ob=desc&q=app&sb=relevance&start=0&view=CONTENT");
+//test_for_search_url();

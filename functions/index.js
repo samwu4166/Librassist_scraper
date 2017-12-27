@@ -45,6 +45,7 @@ exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{t
 					"Accept-Language":"en-US,en;q=0.9",
 					"Connection":"keep-alive"
 			    },
+			    timeout:5000,
 			    json: true, // Automatically parses the JSON string in the response
 				transform: function(body){
 					// use decodeEntities to prevent wrong chinese
@@ -177,6 +178,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{ti
 				        list_num:"25",
 				        current_page:"1",
 				    },
+				    timeout:5000,
 				    headers: {
 				        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
 						"Accept-Language":"en-US,en;q=0.9",
@@ -239,6 +241,7 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}
 			.then(function(searchUrl){
 				var options = {
 						    uri: searchUrl,
+						    timeout:5000,
 						    headers: {
 						        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
 								"Accept-Language":"en-US,en;q=0.9",
@@ -356,6 +359,7 @@ exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{
     	event.data.ref.parent.child('Xinpei_url').set("false");
     	var options = {
 			    uri: 'http://webpac.tphcc.gov.tw/toread/opac/search?',
+			    timeout:5000,
 			    qs: {
 			        q:key,
 			        max:"1",  //2->50 books
@@ -435,6 +439,7 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
 		const count_book = results[0].val();
 		var options = {
 			    uri: searchUrl,
+			    timeout:5000,
 			    headers: {
 			        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
 					"Accept-Language":"en-US,en;q=0.9",
@@ -533,6 +538,7 @@ exports.hot_key_info = functions.database.ref('/hot_key/trigger')
 	event.data.ref.parent.child('trigger').set('searching');
 	var options = {
 			    uri: 'http://book.tpml.edu.tw/webpac/webpacIndex.jsp',
+			    timeout:5000,
 			    headers: {
 			        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
 					"Accept-Language":"en-US,en;q=0.9",
@@ -579,6 +585,7 @@ exports.new_book_url = functions.database.ref('/new_book/trigger')
 	var url = "http://webpac.lib.ntpu.edu.tw/newbook_focus.cfm";
 	var options = {
 		    uri: url,
+		    timeout:5000,
 		    headers: {
 		        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
 				"Accept-Language":"en-US,en;q=0.9",
@@ -625,6 +632,7 @@ exports.new_book_info = functions.database.ref('/new_book/temp_result/{pushId}/l
 	var url = event.data.val();
 	var options = {
 		    uri: url,
+		    timeout:5000,
 		    headers: {
 		        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
 				"Accept-Language":"en-US,en;q=0.9",
