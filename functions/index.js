@@ -31,7 +31,7 @@ admin.initializeApp(functions.config().firebase);
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 exports.ntpu_scrape_info = functions.database.ref('/user_data/{userId}/search/{time}/temp_search_ntpu/{pushId}/link')
     .onCreate(event => {
-   
+    
 	const searchUrl = event.data.val();
 	const uid = event.params.userId;
 	const local_time = event.params.time;
@@ -164,7 +164,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{ti
     	var counter = 0;
     	console.log("uid is "+uid);
     	const root = event.data.ref.root;
-    
+    	var havdData = false;
     	event.data.ref.parent.child('ntpu_url').set('false');
     	const key = event.data.val();
     		
@@ -196,6 +196,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{ti
 					
 						var json = {title:"",author:"",link:"",refresh:"false",img:"",searchState:"",location:"",storage:"",publish_year:"",publisher:"",isbn:""};
 						$(".list_box").filter(function(){
+								havdData = true;
 								var data_title = $(this).children().find("li>a").text().trim();
 								var data_author = $(this).children().find(".product_info_content>p").first().text().trim();
 								var link = $(this).children().find("li>a").attr("href");	
@@ -350,6 +351,7 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}
 exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{time}/key')
     .onCreate(event => {
 
+    	event.data.ref.parent.child('error_xinpei').remove();
     	const uid = event.params.userId;
     	const local_time = event.params.time;
     	console.log("(sinpei)uid is "+uid);
@@ -431,6 +433,7 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
     const searchUrl = event.data.val();
 	const uid = event.params.userId;
 	const local_time = event.params.time;
+	var havdData = false;
 	const pr1 = event.data.ref.parent.child('storage').once('value');
 	const root = event.data.ref.root;
 	event.data.ref.parent.child('searchState').set("Pending!");
@@ -456,11 +459,13 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
 			var json = {title:"",author:"",location:"",link:"",img:"",searchState:"",storage:"",isbn:"",publish_year:"",publisher:""};
 			
 			$(".reslt_item_head").filter(function(){       //title
+				havdData = true;
 				var data_title = $(this).text().trim();
 				data_title = data_title.replace("/","");
 				json.title = data_title;
 			})
 			$(".img_reslt").filter(function(){       //image
+				havdData = true;
 				var data_img = $(this).find("#Any_10").attr("src");
 				if(data_img == null)
 				{
@@ -470,6 +475,7 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
 			})
 
 			$(".bibViewTable").filter(function(){        //author, isbn, year, publisher
+				havdData = true;
 				var data_author="", data_isbn="", data_year="", data_publisher="";
 				for(var i = 0 ; i<20;i++){
 					var str="#For_"+i+">th";
@@ -515,13 +521,17 @@ exports.Xinpei_search_info = functions.database.ref('/user_data/{userId}/search/
 				admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/search_result').push(json);
 				
 			})
-					
+			if(!havdData)
+			{
+				admin.database().ref('/user_data/'+uid+'/search/'+local_time).update({error_xinpei:"URL_no_resp"});
+			}
 		})
 		.catch(reason => {
 			event.data.ref.parent.child('searchState').set(reason);
 		});
 		
 		return Promise.all([searchrp]);
+			
 	})
 	.then(()=>{
 		return event.data.ref.parent.remove();
