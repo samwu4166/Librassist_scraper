@@ -177,7 +177,7 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{ti
 				        k0:key,
 				        t0:"k",
 				        c0:"and",
-				        list_num:"25",
+				        list_num:"50",
 				        current_page:"1",
 				    },
 				    timeout:5000,
@@ -231,6 +231,91 @@ exports.ntpu_search_url = functions.database.ref('/user_data/{userId}/search/{ti
 			});
     	
     });
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+exports.tc_search_url = functions.database.ref('/user_data/{userId}/search/{time}/key')
+    .onCreate(event => {
+
+    	const uid = event.params.userId;
+    	const local_time = event.params.time;
+    	var counter = 0;
+    	console.log("uid is "+uid);
+    	const root = event.data.ref.root;
+    	var instance, _page;
+    	event.data.ref.parent.child('tc_url').set('false');
+    	const key = event.data.val();
+    	
+    	const searchrp = 
+    	phantom
+        .create( [ '--ignore-ssl-errors=yes' ])
+        .then(ph=>{
+            instance = ph;
+            return instance.createPage();
+        })
+        .then(page=>{
+            _page = page;
+            _page.setting( 'resourceTimeout', 5000 ); // resource timeout
+            _page.setting('userAgent', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36")
+            _page.on('onConsoleMessage', true, function(msg) {
+                console.log(msg);
+            })
+            return _page.open('http://book.tpml.edu.tw/webpac/booksearch.do?search_field=FullText&search_input='+key+"&Submit=%E6%9F%A5%E8%A9%A2&resid=188940342&nowpage=1");
+        })
+        .then(status=>{
+            console.log(status);
+            return new Promise(resolve => setTimeout(resolve, 2000))
+            .then(()=>{
+                console.log("wait 2 sec..");
+            })
+        })
+        .then(()=>{
+            console.log("start fetch content")
+            return _page.property('content');
+        })
+        .then( body =>{
+        	var json = {title:"",author:"",link:"",refresh:"false",img:"",searchState:"false",location:"tc_lib",storage:"",publish_year:"",publisher:"",isbn:""};
+            let $ = cheerio.load(body,{decodeEntities:false});
+            // console.log($(".tablesorter").text());
+           
+            $("td > h4 > a").filter(function(index) {
+
+                var title_author = $(this).text();
+                var href = $(this).attr("href");
+               
+                if(title_author.search(" /")>=0){
+                    json.title = title_author.split(" /")[0];
+                    json.author = title_author.split(" /")[1];
+                }
+                else if(title_author.search("/ ")>=0){
+                    json.title = title_author.split("/ ")[0];
+                    json.author = title_author.split("/ ")[1];
+                }
+               else if(title_author.search(" / ")>=0){
+                    json.title = title_author.split(" / ")[0];
+                    json.author = title_author.split(" / ")[1];
+                }
+                counter++;
+                json.link = "http://book.tpml.edu.tw/webpac/"+href;
+                admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/temp_search_tc').push(json);
+                
+            });
+        })
+        .catch(reason =>{
+        	console.log(reason)
+        	return event.data.ref.parent.child('tc_url').set("0");
+        })
+
+
+		return Promise.all([searchrp]).then(()=>{
+				console.log("Scrape "+key+" success");
+					//event.data.ref.parent.child('key').remove();
+				return event.data.ref.parent.child('tc_url').set(counter.toString());
+		})
+		.catch(reason => {
+			
+		});
+    	
+    });
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}/temp_search_ntpu/{pushId}/refresh')
@@ -366,7 +451,7 @@ exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{
 			    timeout:5000,
 			    qs: {
 			        q:key,
-			        max:"1",  //2->50 books
+			        max:"2",  //2->50 books
 			        view:"CONTENT",
 			        location:"0",
 			    },
@@ -810,23 +895,14 @@ exports.ntc_sign = functions.database.ref('/user_data/{userId}/library_account/n
 
             document.querySelector("input[name='codenumber']").value = document.querySelector("input[id='codeVal']").value
 
+            document.querySelector("input[type='submit']").onclick();
 
 
           },username,password)
 
           .then(()=> {
 
-            _page.sendEvent('keydown', 16777217, null, null)
-            _page.sendEvent('keydown', 16777217, null, null)
-            _page.sendEvent('keydown', 16777217, null, null)
-            _page.sendEvent('keydown', 16777217, null, null)
-            _page.sendEvent('keydown', 16777217, null, null)
-            _page.sendEvent('keydown', 16777217, null, null)
-            _page.sendEvent('keydown', 16777217, null, null)
-
-            _page.sendEvent('keydown', 16777221, null, null)
-
-            return new Promise(resolve => setTimeout(resolve, 20000))
+            return new Promise(resolve => setTimeout(resolve, 15000))
 
           })
 
@@ -1327,108 +1403,3 @@ exports.ntpu_userdata = functions.database.ref('/user_data/{userId}/borrow_book/
         })
 
     })
-
-exports.tc_userdata = functions.database.ref('/user_data/{userId}/borrow_book/trigger')
-    .onCreate(event => {
-
-    var instance, _page
-    const uid = event.params.userId;
-    const pr1 = admin.database().ref('/user_data/'+uid+'/library_account/tc_lib/account').once('value');
-    const pr2 = admin.database().ref('/user_data/'+uid+'/library_account/tc_lib/password').once('value');
-    console.log("start fetching username and password from " + uid + "....")
-
-	function login(name, pass) {
-	    return new Promise(function (resolve, reject) {
-	        _page.on('onAlert', function (msg) {
-	            reject(msg)
-	        })
-	        _page.on('onLoadFinished', function (status) {
-	            console.log('Status: ' + status)
-	            resolve(status)
-	        })
-	        _page.evaluate(function (name, pass) {
-	            document.querySelector("form[name='memberlogin']").autocomplete = "on"
-	            document.querySelector("input[name='account2']").value = name
-	            document.querySelector("input[name='passwd2']").value = pass
-	            document.querySelector("form[name='memberlogin']").submit()
-	            console.log("Login submitted!")
-	        }, name, pass)
-	    })
-	}
-
-	async function tp_data() {
-	    let instance = await phantom.create()
-	    try {
-	        _page = await instance.createPage()
-	        _page.setting('userAgent', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36")
-	        await _page.on('onConsoleMessage', true, function (msg) {
-	            console.log('msg: ' + msg)
-	        })
-	        await _page.open('http://book.tpml.edu.tw/webpac/webpacIndex.jsp')
-
-	        await login(username,password)
-	        await _page.off('onLoadFinished')
-	        await _page.off('onAlert')
-
-	        await _page.open('http://book.tpml.edu.tw/webpac/personalization/MyLendList1.jsp')
-
-	        var $
-	        var times = 0
-	        do {
-	            ++times
-	            await new Promise(resolve => setTimeout(resolve, 1000))
-	            let content = await _page.property('content')
-	            $ = cheerio.load(content)
-	            console.log(times)
-	        } while (times <= 5 && $('h2 > img').html() != null)
-	        
-	        var counts = 30;
-	        var data = $('#lendlist > tbody > tr > td')
-	        for (var i = 0; i < data.length; i+=9) {
-	        	counts++;
-	            var auther = $(data[i + 6]).text().trim()
-	            var borrow_time = $(data[i + 7]).text().trim()
-	            var location = "臺北市立圖書館"
-	            var renew_count = $(data[i + 3]).text().trim()
-	            var return_time = "-/-/-"
-	            var title = $(data[i + 5]).text().trim()
-	            var search_book_number = $(data[i + 4]).text().trim()
-
-	            var json = {
-	            	[counts]:{
-		                "auther": auther,
-		                "borrow_time": borrow_time,
-		                "location": location,
-		                "renew_count": renew_count,
-		                "return_time": return_time,
-		                "title": title,
-		                "search_book_number": search_book_number
-	            	}
-	            }
-	            /////////////////////////////////////////////////////
-	            admin.database().ref('/user_data/{userId}/borrow_book/list').update(jsons);
-	            //console.log(json);
-	            /////////////////////////////////////////////////////
-	        }
-	    } catch (e) {
-	        console.log('Error : ' + e)
-	    }
-
-	    return instance.exit()
-	}
-
-	return Promise.all([pr1, pr2]).then(results => {
-
-            event.data.ref.parent.child('State').set('pending');
-
-            const username = results[0].val()
-            const password = results[1].val()
-
-            console.log(username+" start login");
-            return tp_data().then(()=>{
-            	console.log("end searching...")
-            	//event.data.ref.parent.child('trigger').remove();
-            })
-        })
-
-})
