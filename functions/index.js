@@ -433,7 +433,115 @@ exports.ntpu_refresh = functions.database.ref('/user_data/{userId}/search/{time}
 			})
 		})
 	});
+
+exports.tc_search_info = functions.database.ref('/user_data/{userId}/search/{time}/temp_search_tc/{pushId}/link')
+    .onCreate(event => {
+
+    const searchUrl = event.data.val();
+	const uid = event.params.userId;
+	const local_time = event.params.time;
+	var instance,_page;
+	event.data.ref.parent.child('searchState').set("Pending!");
+	var url = searchUrl;
+    const pr =
+    phantom
+        .create()
+        .then(ph=>{
+            instance = ph;
+            return instance.createPage();
+        })
+        .then(page=>{
+            _page = page;
+            return _page.open(url);
+        })
+        .then(status=>{
+            console.log(status);
+            return new Promise(resolve => setTimeout(resolve, 2000))
+        })
+        .then(()=>{
+            return _page.property('content');
+        })
+        .then(content=>{
+            //_page.render("look.png");
+            //fs.writeFile('message.txt',content);
+            var $ = cheerio.load(content);
+            var find_ISBN;
+            find_ISBN = 0; // 0 == false  ; 1 == true
+            var jsons = {
+                                "isbn":"",
+                                "title":"",
+                                "author":"",
+                                "img":"",
+                                "publish_year":"",
+                                "publisher":"",
+                                "link":url,
+                                "location":"tc_lib",
+                                "storage":"",
+                                "searchState":"true"
+                        };
+            var title = $(".mainconC > h3").text().trim();
+            jsons.title = title;
+
+            $('#detailViewDetailContent > table > tbody').filter(function(){
+                var tag = $(this).find("td").eq(0).text();
+                var value = $(this).find("td").eq(1).text();
+                if(tag.search("出版項")>=0)
+                    jsons.publisher = value;
+                    //console.log(value);
+            })
+
+
+            $('#detailViewDetailContent').filter(function(){
+                var num = $('#detailViewDetailContent').children().length
+                for (var i = 0; i < num; i++) {
+                    var data = $(this).children().eq(i).children().children().children().first().text();
+                    if(data=="ISBN：" && find_ISBN == 0){
+                        var ISBN = $(this).children().eq(i).children().children().children().last().text();
+                        var m = (ISBN.indexOf("("));
+                        ISBN = ISBN.slice(0,m);
+                        jsons.isbn = ISBN;
+                        //console.log(ISBN);
+                        find_ISBN = 1;
+                    }
+                    if(data=="著者："){
+                        var author = $(this).children().eq(i).children().children().children().last().text();
+                        jsons.author = author;
+                        //console.log(author);
+                    }
+                   
+                }                
+            }) 
+            
+            //----------書圖片網址------------------------
+            var img = $('.myImages').children().attr('src');
+            jsons.img = img;
+            //console.log(img);
+            //-------------館藏量-------------------------
+            var storage = $('#integratehold').text().trim();
+            var index = (storage.indexOf("件館藏"));
+            if(index == -1){
+                //console.log("目前沒有館藏");
+                jsons.storage = "0";
+                storage = 0;
+            }
+            else{
+                storage = storage.slice(0,index);
+                jsons.storage = storage;
+                //console.log(storage);
+            }
+            admin.database().ref('/user_data/'+uid+'/search/'+local_time+'/search_result').push(jsons);
+            //----------------------------------------------
+        })
+        .catch(err=>{
+            console.log(err);
+        })
+
+    return Promise.all([pr])
+			.then(()=>{
+				return event.data.ref.parent.remove();
+			})
 	
+})
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 exports.Xinpei_search_url = functions.database.ref('/user_data/{userId}/search/{time}/key')
     .onCreate(event => {
@@ -877,41 +985,49 @@ exports.ntc_sign = functions.database.ref('/user_data/{userId}/library_account/n
 
 		  .then(status => {
 
-        return new Promise(function (resolve, reject) {
+        	return new Promise(function (resolve, reject) {
+          var condition = 0  // 0: timeout  1: success 2: fail
+            _page.on('onUrlChanged', function (url) {
+                if (url == 'http://www.library.ntpc.gov.tw/') {
+                    condition = 1
+                    resolve()
+                }
+            })
 
-          _page.on('onUrlChanged', function (url) {
-          	if (url == 'http://www.library.ntpc.gov.tw/') {
-				resolve(url)
-          	}
-          })
-
-          _page.evaluate(function (name,pass) {
-
-
-
-            document.querySelector("input[id='loginUsername']").value = name
-
-            document.querySelector("input[id='loginPassword']").value = pass
-
-            document.querySelector("input[name='codenumber']").value = document.querySelector("input[id='codeVal']").value
-
-            document.querySelector("input[type='submit']").onclick();
-
-
-          },username,password)
-
-          .then(()=> {
-
-            return new Promise(resolve => setTimeout(resolve, 15000))
-
-          })
-
-          .then((p)=> {
-
-            reject("timeout")
-
-          })
-
+            _page.evaluate(function (name, pass) {
+                document.querySelector("input[id='loginUsername']").value = name
+                document.querySelector("input[id='loginPassword']").value = pass
+                document.querySelector("input[name='codenumber']").value = document.querySelector("input[id='codeVal']").value
+                document.querySelector("input[type='submit']").onclick();
+                console.log("Login submitted!")
+            }, username, password)
+            .then(() => {
+                var start = new Date().getTime(),
+                    interval = setInterval(function () {
+                    //  20s 超時
+                    if ((new Date().getTime() - start < 20000) && condition == 0) {
+                        console.log((new Date().getTime() - start))
+                        _page.property('content')
+                            .then((body) => {
+                                var $ = cheerio.load(body)
+                                if ($('td > #messSpan').text() != null) {
+                                    condition = 2
+                                }
+                            })
+                    } else {
+                        if (condition == 0) {
+                            reject("timeout");
+                            clearInterval(interval); //< Stop this interval
+                        } else if (condition == 1) {
+                            console.log("finished in " + (new Date().getTime() - start) + "ms.");
+                            clearInterval(interval); //< Stop this interval
+                        } else {
+                            reject("Incorrect passward!!")
+                            clearInterval(interval); //< Stop this interval
+                        }
+                    }
+                }, 500); //< repeat check every 500ms
+            })
         })
 
       })
@@ -1186,7 +1302,7 @@ exports.ntpu_sign = functions.database.ref('/user_data/{userId}/library_account/
 
 })
 
-exports.ntpu_userdata = functions.database.ref('/user_data/{userId}/borrow_book/trigger')
+exports.ntpu_list = functions.database.ref('/user_data/{userId}/borrow_book/trigger')
     .onCreate(event => {
         event.data.ref.parent.child('State').set('initialize');
         const uid = event.params.userId;
@@ -1199,8 +1315,8 @@ exports.ntpu_userdata = functions.database.ref('/user_data/{userId}/borrow_book/
 
             event.data.ref.parent.child('State').set('pending');
 
-            const username = results[0].val()
-            const password = results[1].val()
+            const username = results[0].val();
+            const password = results[1].val();
 
             console.log(username+" start login");
             const pr = phantom.create()
@@ -1215,9 +1331,6 @@ exports.ntpu_userdata = functions.database.ref('/user_data/{userId}/borrow_book/
                         console.log(msg)
                     })
                     return _page.open('http://webpac.library.ntpu.edu.tw/Webpac2/Person.dll/');
-                })
-                .then(status =>{
-                	return 
                 })
                 .then(status => {
                     return new Promise(function (resolve, reject) {
@@ -1235,8 +1348,8 @@ exports.ntpu_userdata = functions.database.ref('/user_data/{userId}/borrow_book/
                         }, username, password)
                     })
                 })
-                .then((portSize) => {
-                	console.log(username+" is log in,start search info..");
+                .then(() => {
+                	console.log( username+" is log in,start search info..");
                     const prr = _page.sendEvent('click', 80, 150);
                     return Promise.all([
                     	prr,
@@ -1403,3 +1516,328 @@ exports.ntpu_userdata = functions.database.ref('/user_data/{userId}/borrow_book/
         })
 
     })
+
+exports.ntc_list = functions.database.ref('/user_data/{userId}/borrow_book/trigger')
+.onCreate(event =>{
+    
+	event.data.ref.parent.child('ntc_State').set('initialize')
+	const uid = event.params.userId;
+	const pr1 = admin.database().ref('/user_data/'+uid+'/library_account/ntc_lib/account').once('value');
+    const pr2 = admin.database().ref('/user_data/'+uid+'/library_account/ntc_lib/password').once('value');
+    var countt = 0;
+	console.log("start fetching username and password from "+uid+"....")
+	var instance, _page;
+	return Promise.all([pr1,pr2]).then(results =>{
+		event.data.ref.parent.child('ntc_State').set('pending')
+		console.log("fetching success!")
+		const username = results[0].val()
+		const password = results[1].val()
+		console.log("user is "+username);
+		const pr = 
+		  phantom
+		  .create()
+		  .then(ph => {
+		    instance = ph
+		    return instance.createPage()
+		  })
+		  .then(page => {
+		  	console.log("create page success")
+		    _page = page
+		    _page.setting('userAgent', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36")
+		    _page.on('onConsoleMessage', true, function(msg) {
+		        console.log('msg: ' + msg)
+		    })
+		    return _page.open('http://www.library.ntpc.gov.tw/loginControl/')
+		  })
+		  .then(status => {
+        return new Promise(function (resolve, reject) {
+          var condition = 0  // 0: timeout  1: success 2: fail
+            _page.on('onUrlChanged', function (url) {
+                if (url == 'http://www.library.ntpc.gov.tw/') {
+                    condition = 1
+                    resolve()
+                }
+            })
+
+            _page.evaluate(function (name, pass) {
+                document.querySelector("input[id='loginUsername']").value = name
+                document.querySelector("input[id='loginPassword']").value = pass
+                document.querySelector("input[name='codenumber']").value = document.querySelector("input[id='codeVal']").value
+                document.querySelector("input[type='submit']").onclick();
+                console.log("Login submitted!")
+            }, username, password)
+            .then(() => {
+                var start = new Date().getTime(),
+                    interval = setInterval(function () {
+                    //  20s 超時
+                    if ((new Date().getTime() - start < 20000) && condition == 0) {
+                        console.log((new Date().getTime() - start))
+                        _page.property('content')
+                            .then((body) => {
+                                var $ = cheerio.load(body)
+                                if ($('td > #messSpan').text() != null) {
+                                    condition = 2
+                                }
+                            })
+                    } else {
+                        if (condition == 0) {
+                            reject("timeout");
+                            clearInterval(interval); //< Stop this interval
+                        } else if (condition == 1) {
+                            console.log("finished in " + (new Date().getTime() - start) + "ms.");
+                            clearInterval(interval); //< Stop this interval
+                        } else {
+                            reject("Incorrect passward!!")
+                            clearInterval(interval); //< Stop this interval
+                        }
+                    }
+                }, 500); //< repeat check every 500ms
+            })
+        })
+      })
+      .then((p)=> {
+        console.log(username+": log success!")
+        return _page.property('content')
+      })
+      .then((content)=> {
+        var $ = cheerio.load(content)
+        var url = $(".remove-text-nodes:nth-child(1) > li:nth-child(3) > a").attr('href')
+        console.log(url)
+        return _page.open(url)
+      })
+      .then((p)=> {
+        return new Promise(resolve => setTimeout(resolve, 3000))
+      })
+      .then((p)=> {
+        return _page.property('content')
+      })
+      .then((content)=> {
+        console.log('loading list')
+        var $ = cheerio.load(content)
+    	
+        var data = $('#If_11 > tbody > tr > td')
+        for (var i = 0; i < data.length; i+=12) {
+          countt++;
+          var borrow_time = $(data[i + 8]).text().trim()
+          var location = "新北市立圖書館 " + $(data[i + 3]).text().trim()
+          var renew_count = $(data[i + 10]).text().trim()
+          var title = $(data[i + 2]).text().trim()
+          var search_book_number = $(data[i + 6]).text().trim()
+    
+          var json = {
+              "borrow_time": borrow_time,
+              "location": location,
+              "renew_count": renew_count,
+              "title": title,
+              "search_book_number": search_book_number
+          }
+          /////////////////////////////////////////////////////
+          admin.database().ref('/user_data/'+uid+'/borrow_book/list').update({[countt]:json});
+          /////////////////////////////////////////////////////
+        }
+        return new Promise(resolve => setTimeout(resolve, 3000))
+      })
+      .then((p)=> {
+        return _page.open('http://webpac.tphcc.gov.tw/toread/opac/patron_transactions?t=history')
+      })
+      .then((p)=> {
+        return new Promise(resolve => setTimeout(resolve, 2000))
+      })
+      .then((p)=> {
+        return _page.property('content')
+      })
+      .then((content)=> {
+        //console.log('loading history')
+        var $ = cheerio.load(content)
+    
+        var data = $('.items_tbl_wrap > div > div:nth-child(2) > table > tbody > tr > td')
+        for (var i = 0; i < data.length; i+=9) {
+          countt++;
+          var borrow_time = $(data[i + 6]).text().trim()
+          var location = "新北市立圖書館 " + $(data[i + 3]).text().trim()
+          var title = $(data[i + 1]).text().trim()
+          var search_book_number = $(data[i + 5]).text().trim()
+    
+          var json = {
+              "borrow_time": borrow_time,
+              "location": location,
+              "title": title,
+              "search_book_number": search_book_number
+          }
+          /////////////////////////////////////////////////////
+          admin.database().ref('/user_data/'+uid+'/borrow_book/list').update({[countt]:json});
+          /////////////////////////////////////////////////////
+        }
+        return new Promise(resolve => setTimeout(resolve, 1000))
+      })
+      .then((p)=> {
+        const off = _page.off('onLoadFinished');
+        return Promise.all([off])
+      })
+      .then(()=> {
+        event.data.ref.parent.child('ntc_State').set('Finish')
+        instance.exit()
+      })
+      .catch(e => {
+        console.log(username+"login Failed! " + e)
+        const off = _page.off('onLoadFinished');
+        return Promise.all([off]).then(()=>{
+          event.data.ref.parent.child('ntc_State').set('Error')
+          instance.exit()
+        })
+      });
+
+      return Promise.all([pr]).then(()=>{
+        return event.data.ref.parent.child('trigger').remove()
+      })
+    })
+})
+
+exports.tc_list = functions.database.ref('/user_data/{userId}/borrow_book/trigger')
+.onCreate(event =>{
+    
+	event.data.ref.parent.child('tc_State').set('initialize')
+	const uid = event.params.userId;
+	const pr1 = admin.database().ref('/user_data/'+uid+'/library_account/tc_lib/account').once('value');
+    const pr2 = admin.database().ref('/user_data/'+uid+'/library_account/tc_lib/password').once('value');
+	var countt = 20;
+	console.log("start fetching username and password from "+uid+"....")
+	var instance, _page;
+	return Promise.all([pr1,pr2]).then(results =>{
+		event.data.ref.parent.child('tc_State').set('pending')
+		console.log("fetching success!")
+		const username = results[0].val()
+		const password = results[1].val()
+		console.log("user is "+username);
+		const pr = 
+		  phantom
+		  .create()
+      .then(ph => {
+        instance = ph;
+        return instance.createPage();
+      })
+      .then(page => {
+        _page = page;
+        _page.setting('userAgent', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36")
+        _page.on('onConsoleMessage', true, function(msg) {
+            console.log(msg)
+        })
+        return _page.open('http://book.tpml.edu.tw/webpac/webpacIndex.jsp');
+      })
+      .then(status => {
+        return new Promise(function (resolve, reject) {
+          _page.on('onAlert', function (msg) {
+            reject(msg)
+          })
+          _page.on('onLoadFinished', function (status) {
+            resolve(status)
+          })
+          _page.evaluate(function (name, pass) {
+            
+            document.querySelector("form[name='memberlogin']").autocomplete = "on";
+            document.querySelector("input[name='account2']").value = name;
+            document.querySelector("input[name='passwd2']").value = pass;
+            document.querySelector("form[name='memberlogin']").submit();
+            
+          },username,password)
+        })
+      })
+      .then((p)=> {
+        console.log(username+": log success!")
+        return _page.open('http://book.tpml.edu.tw/webpac/personalization/MyLendList1.jsp');
+      })
+      .then((p)=> {
+        return new Promise(resolve => setTimeout(resolve, 5000))
+      })
+      .then((p)=> {
+        return _page.property('content')
+      })
+      .then((content)=> {
+        //console.log('loading list')
+        var $ = cheerio.load(content)
+    
+        var data = $('#lendlist > tbody > tr > td')
+        for (var i = 0; i < data.length; i+=9) {
+        	countt++;
+          var author = $(data[i + 6]).text().trim()
+          var borrow_time = $(data[i + 7]).text().trim()
+          var location = "臺北市立圖書館"
+          var renew_count = $(data[i + 3]).text().trim()
+          var title = $(data[i + 5]).text().trim()
+          var search_book_number = $(data[i + 4]).text().trim()
+    
+          var json = {
+              "author": author,
+              "borrow_time": borrow_time,
+              "location": location,
+              "renew_count": renew_count,
+              "title": title,
+              "search_book_number": search_book_number
+          }
+          /////////////////////////////////////////////////////
+          admin.database().ref('/user_data/'+uid+'/borrow_book/list').update({[countt]:json});
+          //console.log(json);
+          //console.log('\n')
+          /////////////////////////////////////////////////////
+        }
+        return new Promise(resolve => setTimeout(resolve, 1000))
+      })
+      .then((p)=> {
+        return _page.open('http://book.tpml.edu.tw/webpac/personalization/MyLendHistory.do');
+      })
+      .then((p)=> {
+        return new Promise(resolve => setTimeout(resolve, 5000))
+      })
+      .then((p)=> {
+        return _page.property('content')
+      })
+      .then((content)=> {
+        //console.log('loading history')
+        var $ = cheerio.load(content)
+    
+        var data = $('.tablesorter > tbody > tr > td')
+        for (var i = 0; i < data.length; i+=6) {
+        	countt++;
+          var author = $(data[i + 3]).text().split(' / ')[1].trim()
+          var borrow_time = $(data[i + 4]).text().trim()
+          var location = "臺北市立圖書館 " + $(data[i + 5]).text().trim()
+          var title = $(data[i + 3]).text().split(' / ')[0].trim()
+          var search_book_number = $(data[i + 2]).text().trim()
+    
+          var json = {
+              "author": author,
+              "borrow_time": borrow_time,
+              "location": location,
+              "title": title,
+              "search_book_number": search_book_number
+          }
+          /////////////////////////////////////////////////////
+          admin.database().ref('/user_data/'+uid+'/borrow_book/list').update({[countt]:json});
+          //console.log(json);
+          //console.log('\n')
+          /////////////////////////////////////////////////////
+        }
+        return new Promise(resolve => setTimeout(resolve, 1000))
+      })
+      .then((p)=> {
+        const off = _page.off('onLoadFinished');
+        return Promise.all([off])
+      })
+      .then(()=> {
+        event.data.ref.parent.child('tc_State').set('Finish')
+        instance.exit()
+      })
+      .catch(e => {
+        console.log(username+"login Failed! " + e)
+        const off = _page.off('onLoadFinished');
+        return Promise.all([off]).then(()=>{
+          event.data.ref.parent.child('tc_State').set('Error')
+          instance.exit()
+        })
+      });
+
+      return Promise.all([pr]).then(()=>{
+        return event.data.ref.parent.child('trigger').remove()
+      })
+    })
+})
