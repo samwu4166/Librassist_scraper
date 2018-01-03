@@ -23,6 +23,8 @@ const request = require("request");
 const cheerio = require("cheerio");
 const rp = require("request-promise");
 const rp2 = require("request-promise");
+var ic = require('iconv-lite')
+var BufferHelper = require('bufferhelper')
 const phantom = require("phantom");
 // The Firebase Admin SDK to access the Firebase Realtime Database. 
 const admin = require('firebase-admin');
@@ -725,82 +727,6 @@ exports.new_book_info = functions.database.ref('/new_book/temp_result/{pushId}/l
 		admin.database().ref('/new_book/trigger').set('DeleteMe_to_search');
 	})
 })
-exports.ntpu_sign = functions.database.ref('/user_data/{userId}/library_account/ntpu_lib/key')
-.onCreate(event =>{
-
-	event.data.ref.parent.child('State').set('initialize');
-	const uid = event.params.userId;
-	const pr1 = event.data.ref.parent.child('account').once('value');
-	const pr2 = event.data.ref.parent.child('password').once('value');
-	console.log("start fetching username and password from "+uid+"....")
-	var instance, _page;
-	return Promise.all([pr1,pr2]).then(results =>{
-		event.data.ref.parent.child('State').set('pending');
-		console.log("fething success!")
-		const username = results[0].val()
-		const password = results[1].val()
-		console.log("user is "+username);
-		const pr = 
-		  phantom
-		  .create()
-		  .then(ph => {
-		    instance = ph
-		    return instance.createPage()
-		  })
-		  .then(page => {
-		  	console.log("create page success")
-		    _page = page
-		    _page.setting('userAgent', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36")
-		    _page.on('onConsoleMessage', true, function(msg) {
-		        console.log('msg: ' + msg)
-		    })
-		    return _page.open('http://webpac.library.ntpu.edu.tw/Webpac2/Person.dll/')
-		  })
-		  .then(status => {
-		    return new Promise(function (resolve, reject) {
-		      _page.on('onAlert', function (msg) {
-		        reject(msg)
-		      })
-		      _page.on('onLoadFinished', function (status) {
-		        resolve(status)
-		      })
-		      console.log("prepare to submit");
-		      _page.evaluate(function (name,pass) {
-		      		
-		        	document.querySelector("input[name='RNO']").value = name;
-		        	document.querySelector("input[name='PWD']").value = pass;
-		        	document.querySelector("form[name='CODE']").submit();
-					
-			      },username,password);
-			    })
-			  })
-			  .then((p)=> {
-			    console.log(username+": log success!")
-			    const off = _page.off('onLoadFinished');
-			    return Promise.all([off])
-			  })
-			  .then(()=> {
-			  	event.data.ref.parent.child('State').set('Finish');
-			    instance.exit()
-			  })
-			  .catch(e => {
-			  	//event.data.ref.parent.child('State').set('Error');
-			    console.log(username+"login Failed! " + e)
-			    const off = _page.off('onLoadFinished');
-			    return Promise.all([off]).then(()=>{
-			      event.data.ref.parent.child('State').set('Error');
-			      instance.exit()
-			      
-			    })
-			  });
-			 
-			return Promise.all([pr]).then(()=>{
-
-				  	return event.data.ref.parent.child('key').remove();
-				  })
-	})
-
-})
 
 exports.ntc_sign = functions.database.ref('/user_data/{userId}/library_account/ntc_lib/key')
 
@@ -1103,5 +1029,406 @@ exports.tc_sign = functions.database.ref('/user_data/{userId}/library_account/tc
 		})
 
 	})
+
+})
+
+exports.ntpu_sign = functions.database.ref('/user_data/{userId}/library_account/ntpu_lib/key')
+.onCreate(event =>{
+
+	event.data.ref.parent.child('State').set('initialize');
+	const uid = event.params.userId;
+	const pr1 = event.data.ref.parent.child('account').once('value');
+	const pr2 = event.data.ref.parent.child('password').once('value');
+	console.log("start fetching username and password from "+uid+"....")
+	var instance, _page;
+	return Promise.all([pr1,pr2]).then(results =>{
+		event.data.ref.parent.child('State').set('pending');
+		console.log("fething success!")
+		const username = results[0].val()
+		const password = results[1].val()
+		console.log("user is "+username);
+		const pr = 
+		  phantom
+		  .create()
+		  .then(ph => {
+		    instance = ph
+		    return instance.createPage()
+		  })
+		  .then(page => {
+		  	console.log("create page success")
+		    _page = page
+		    _page.setting('userAgent', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36")
+		    _page.on('onConsoleMessage', true, function(msg) {
+		        console.log('msg: ' + msg)
+		    })
+		    return _page.open('http://webpac.library.ntpu.edu.tw/Webpac2/Person.dll/')
+		  })
+		  .then(status => {
+		    return new Promise(function (resolve, reject) {
+		      _page.on('onAlert', function (msg) {
+		        reject(msg)
+		      })
+		      _page.on('onLoadFinished', function (status) {
+		        resolve(status)
+		      })
+		      console.log("prepare to submit");
+		      _page.evaluate(function (name,pass) {
+		      		
+		        	document.querySelector("input[name='RNO']").value = name;
+		        	document.querySelector("input[name='PWD']").value = pass;
+		        	document.querySelector("form[name='CODE']").submit();
+					
+			      },username,password);
+			    })
+			  })
+			  .then((p)=> {
+			    console.log(username+": log success!")
+			    const off = _page.off('onLoadFinished');
+			    return Promise.all([off])
+			  })
+			  .then(()=> {
+			  	event.data.ref.parent.child('State').set('Finish');
+			  	event.data.ref.parent.child('search_key').set('go');
+			    instance.exit()
+			  })
+			  .catch(e => {
+			  	//event.data.ref.parent.child('State').set('Error');
+			    console.log(username+"login Failed! " + e)
+			    const off = _page.off('onLoadFinished');
+			    return Promise.all([off]).then(()=>{
+			      event.data.ref.parent.child('State').set('Error');
+			      instance.exit()
+			      
+			    })
+			  });
+			 
+			return Promise.all([pr]).then(()=>{
+
+				  	return event.data.ref.parent.child('key').remove();
+				  })
+	})
+
+})
+
+exports.ntpu_userdata = functions.database.ref('/user_data/{userId}/borrow_book/trigger')
+    .onCreate(event => {
+        event.data.ref.parent.child('State').set('initialize');
+        const uid = event.params.userId;
+        const pr1 = admin.database().ref('/user_data/'+uid+'/library_account/ntpu_lib/account').once('value');
+        const pr2 = admin.database().ref('/user_data/'+uid+'/library_account/ntpu_lib/password').once('value');
+        console.log("start fetching username and password from " + uid + "....")
+        var instance, _page, _url_borrow, _url_hist, _jsons = [];
+        var count = 0;
+        return Promise.all([pr1, pr2]).then(results => {
+
+            event.data.ref.parent.child('State').set('pending');
+
+            const username = results[0].val()
+            const password = results[1].val()
+
+            console.log(username+" start login");
+            const pr = phantom.create()
+                .then(ph => {
+                    instance = ph;
+                    return instance.createPage();
+                })
+                .then(page => {
+                    _page = page;
+                    _page.setting('userAgent', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36")
+                    _page.on('onConsoleMessage', function (msg) {
+                        console.log(msg)
+                    })
+                    return _page.open('http://webpac.library.ntpu.edu.tw/Webpac2/Person.dll/');
+                })
+                .then(status =>{
+                	return 
+                })
+                .then(status => {
+                    return new Promise(function (resolve, reject) {
+                        _page.on('onAlert', function (msg) {
+                            reject(msg)
+                        })
+                        _page.on('onLoadFinished', function (status) {
+                            resolve(status)
+                        })
+                        _page.evaluate(function (name, pass) {
+                            document.querySelector("input[name='RNO']").value = name;
+                            document.querySelector("input[name='PWD']").value = pass;
+                            document.querySelector("form[name='CODE']").submit();
+                            console.log("Login submitted!");
+                        }, username, password)
+                    })
+                })
+                .then((portSize) => {
+                	console.log(username+" is log in,start search info..");
+                    const prr = _page.sendEvent('click', 80, 150);
+                    return Promise.all([
+                    	prr,
+                        _page.off('onLoadFinished'),
+                        _page.off('onAlert'),
+                        new Promise(function (resolve) {
+                            _page.on('onResourceReceived', function (response) {
+                                if (response.stage == 'end') {
+                                    var sss = JSON.parse(JSON.stringify(response))
+                                    console.log('borrow ' + sss['url'])
+                                    _url_borrow = sss["url"]
+                                    resolve()
+                                }
+                            })
+                        })
+                    ])
+                })
+                .then((p) => {
+                    const prr = _page.sendEvent('click', 80, 166);
+                    return Promise.all([
+                    	prr,
+                        _page.off('onResourceReceived'),
+                        new Promise(function (resolve) {
+                            _page.on('onResourceReceived', function (response) {
+                                if (response.stage == 'end') {
+                                    var sss = JSON.parse(JSON.stringify(response))
+                                    console.log('history ' + sss['url'])
+                                    _url_hist = sss["url"]
+                                    resolve()
+                                }
+                            })
+                        })
+                    ])
+                })
+                .catch(err=>{
+                	console.log("")
+                })
+
+                return Promise.all([pr]).then(()=>{
+                	console.log("bor :" ,_url_borrow)
+            		console.log("hist :" ,_url_hist)
+                	console.log("end fetching url.....")
+                })
+        })
+        .then(()=>{
+        	
+        	
+            var options = {
+                        uri: _url_borrow,
+                        timeout: 5000,
+                        headers: {
+                            'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
+                            "Accept-Language": "en-US,en;q=0.9",
+                            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+                            "Connection": "keep-alive"
+                        },
+                        encoding: null,
+                        json: true, // Automatically parses the JSON string in the response
+                        transform: function (body) {
+                            var bufferhelper = new BufferHelper();
+                            bufferhelper.concat(body);
+                            body = ic.decode(bufferhelper.toBuffer(), 'Big5')
+                            //console.log(body);
+                            return cheerio.load(body);
+                        }
+                    };
+
+					const pr = rp(options)
+                        .then(function ($) {
+                        	console.log("open borrow url....")
+                            var data = $('td')
+                           
+                            for (var i = 13, len = data.length; i < len; i += 9) {
+                                var renew_count = $(data[i + 6]).text().trim()
+                                var return_time = $(data[i + 5]).text().trim()
+                                var title = $(data[i + 3]).text().trim()
+                                var waiting_people_number = $(data[i + 7]).text().trim()
+                                var jsons = {
+                                    "renew_count": renew_count,
+                                    "return_time": return_time,
+                                    "title": title,
+                                    "waiting_people_number": waiting_people_number,
+                                }
+                                event.data.ref.parent.child('list').update({[count]:jsons});
+                                count++;
+                                
+                            }
+                           
+                        })
+                        .catch(function (err) {
+                            console.log(err);
+                        });
+                return Promise.all([pr]).then(()=>{
+                	console.log("end parse borrow info.")
+                })
+        })
+        .then(()=>{
+
+        	var options2 = {
+                        uri: _url_hist,
+                        timeout: 5000,
+                        headers: {
+                            'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
+                            "Accept-Language": "en-US,en;q=0.9",
+                            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+                            "Connection": "keep-alive"
+                        },
+                        encoding: null,
+                        json: true, // Automatically parses the JSON string in the response
+                        transform: function (body) {
+                            var bufferhelper = new BufferHelper();
+                            bufferhelper.concat(body);
+                            body = ic.decode(bufferhelper.toBuffer(), 'Big5')
+                            return cheerio.load(body);
+                        }
+                    };
+            const pr2 = rp2(options2)
+                        .then(function ($) {
+                            var data = $('td')
+                            for (var i = 12, len = data.length; i < len; i += 8) {
+                                var auther = $(data[i + 5]).text().trim()
+                                var borrow_time = $(data[i + 1]).text().trim()
+                                var location = $(data[i + 3]).text().trim()
+                                var renew_count = "-"
+                                var return_time = "-/-/-"
+                                var title = $(data[i + 4]).text().trim()
+                                var waiting_people_number = "0"
+                                var search_book_number = $(data[i + 7]).text().trim()
+
+                                if (_jsons.length > 0 && _jsons[0]["title"] == title) {
+                                    renew_count = _jsons[0]["renew_count"]
+                                    return_time = _jsons[0]["return_time"]
+                                    waiting_people_number = _jsons[0]["waiting_people_number"]
+                                    _jsons.splice(0, 1)
+                                }
+
+                                var jsons = {
+                                    "auther": auther,
+                                    "borrow_time": borrow_time,
+                                    "location": location,
+                                    "renew_count": renew_count,
+                                    "return_time": return_time,
+                                    "title": title,
+                                    "waiting_people_number": waiting_people_number,
+                                    "search_book_number": search_book_number
+                                }
+                               
+                                /////////////////////////////////////////////////////
+                                event.data.ref.parent.child('list').update({[count]:jsons});
+                                count++;
+                                //console.log(jsons);
+                                /////////////////////////////////////////////////////
+                            }
+                        })
+                        .catch(function (err) {
+                            console.log(err);
+                        });
+
+                        return Promise.all([_page.off('onResourceReceived'),pr2]).then(() => {
+                        console.log("finish searching information..")
+                        event.data.ref.parent.child('trigger').remove();
+                    })
+
+        })
+
+    })
+
+exports.tc_userdata = functions.database.ref('/user_data/{userId}/borrow_book/trigger')
+    .onCreate(event => {
+
+    var instance, _page
+    const uid = event.params.userId;
+    const pr1 = admin.database().ref('/user_data/'+uid+'/library_account/tc_lib/account').once('value');
+    const pr2 = admin.database().ref('/user_data/'+uid+'/library_account/tc_lib/password').once('value');
+    console.log("start fetching username and password from " + uid + "....")
+
+	function login(name, pass) {
+	    return new Promise(function (resolve, reject) {
+	        _page.on('onAlert', function (msg) {
+	            reject(msg)
+	        })
+	        _page.on('onLoadFinished', function (status) {
+	            console.log('Status: ' + status)
+	            resolve(status)
+	        })
+	        _page.evaluate(function (name, pass) {
+	            document.querySelector("form[name='memberlogin']").autocomplete = "on"
+	            document.querySelector("input[name='account2']").value = name
+	            document.querySelector("input[name='passwd2']").value = pass
+	            document.querySelector("form[name='memberlogin']").submit()
+	            console.log("Login submitted!")
+	        }, name, pass)
+	    })
+	}
+
+	async function tp_data() {
+	    let instance = await phantom.create()
+	    try {
+	        _page = await instance.createPage()
+	        _page.setting('userAgent', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36")
+	        await _page.on('onConsoleMessage', true, function (msg) {
+	            console.log('msg: ' + msg)
+	        })
+	        await _page.open('http://book.tpml.edu.tw/webpac/webpacIndex.jsp')
+
+	        await login(username,password)
+	        await _page.off('onLoadFinished')
+	        await _page.off('onAlert')
+
+	        await _page.open('http://book.tpml.edu.tw/webpac/personalization/MyLendList1.jsp')
+
+	        var $
+	        var times = 0
+	        do {
+	            ++times
+	            await new Promise(resolve => setTimeout(resolve, 1000))
+	            let content = await _page.property('content')
+	            $ = cheerio.load(content)
+	            console.log(times)
+	        } while (times <= 5 && $('h2 > img').html() != null)
+	        
+	        var counts = 30;
+	        var data = $('#lendlist > tbody > tr > td')
+	        for (var i = 0; i < data.length; i+=9) {
+	        	counts++;
+	            var auther = $(data[i + 6]).text().trim()
+	            var borrow_time = $(data[i + 7]).text().trim()
+	            var location = "臺北市立圖書館"
+	            var renew_count = $(data[i + 3]).text().trim()
+	            var return_time = "-/-/-"
+	            var title = $(data[i + 5]).text().trim()
+	            var search_book_number = $(data[i + 4]).text().trim()
+
+	            var json = {
+	            	[counts]:{
+		                "auther": auther,
+		                "borrow_time": borrow_time,
+		                "location": location,
+		                "renew_count": renew_count,
+		                "return_time": return_time,
+		                "title": title,
+		                "search_book_number": search_book_number
+	            	}
+	            }
+	            /////////////////////////////////////////////////////
+	            admin.database().ref('/user_data/{userId}/borrow_book/list').update(jsons);
+	            //console.log(json);
+	            /////////////////////////////////////////////////////
+	        }
+	    } catch (e) {
+	        console.log('Error : ' + e)
+	    }
+
+	    return instance.exit()
+	}
+
+	return Promise.all([pr1, pr2]).then(results => {
+
+            event.data.ref.parent.child('State').set('pending');
+
+            const username = results[0].val()
+            const password = results[1].val()
+
+            console.log(username+" start login");
+            return tp_data().then(()=>{
+            	console.log("end searching...")
+            	//event.data.ref.parent.child('trigger').remove();
+            })
+        })
 
 })

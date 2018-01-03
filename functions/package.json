@@ -2,11 +2,13 @@
   "name": "functions",
   "description": "Cloud Functions for Firebase",
   "dependencies": {
+    "bufferhelper": "^0.2.1",
     "chai": "latest",
     "chai-as-promised": "latest",
     "cheerio": "latest",
     "firebase-admin": "latest",
     "firebase-functions": "latest",
+    "iconv-lite": "^0.4.19",
     "mocha": "latest",
     "phantom": "^4.0.11",
     "request": "latest",

@@ -494,7 +494,7 @@ function test_for_search_url(){
 			    timeout : 3000,
 			    resolveWithFullResponse: true,
 				transform: function(body){
-					return cheerio.load(body);
+					return cheerio.load(body,{decodeEntities: false});
 				}
 			};
 			
@@ -539,18 +539,25 @@ function sleep(ms) {
 		}
 function test(){
 	var options = {
-			    uri: 'http://book.tpml.edu.tw/webpac/webpacIndex.jsp',
+			    uri: 'http://webpac.library.ntpu.edu.tw/Webpac2/Person.dll/BOWHIST?transkey=4FC483E46EF05BF46CF355C28D90B586CF79EC4BF361E349&ck=C9400364E674D473E278DE5F&transcop=4FE75AF64F',
 			    headers: {
+			    	"Host": "webpac.library.ntpu.edu.tw",
+			    	"Accept-Encoding":"gzip, deflate",
 			        'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
-					"Accept-Language":"en-US,en;q=0.9",
+					"Accept-Language":"en-US,en;q=0.8",
 					"Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
 					"Connection":"keep-alive"
 			    },
+			    encoding: null,
 			    json: true, // Automatically parses the JSON string in the response
+
 				transform: function(body){
+					
+					console.log(body)
 					return cheerio.load(body);
 				}
 			};
+			
 			rp(options)
 			.then(function($){
 					var title;
@@ -571,6 +578,7 @@ function test(){
 				console.log(err);
 			});
 }
+test();
 //Xinpei_url();
-Xinpei("http://webpac.tphcc.gov.tw/toread/opac/bibliographic_view/461884?location=0&mps=50&ob=desc&q=app&sb=relevance&start=0&view=CONTENT");
+//Xinpei("http://webpac.tphcc.gov.tw/toread/opac/bibliographic_view/461884?location=0&mps=50&ob=desc&q=app&sb=relevance&start=0&view=CONTENT");
 //test_for_search_url();
