@@ -1301,221 +1301,185 @@ exports.ntpu_sign = functions.database.ref('/user_data/{userId}/library_account/
 	})
 
 })
-
 exports.ntpu_list = functions.database.ref('/user_data/{userId}/borrow_book/trigger')
-    .onCreate(event => {
-        event.data.ref.parent.child('State').set('initialize');
-        const uid = event.params.userId;
-        const pr1 = admin.database().ref('/user_data/'+uid+'/library_account/ntpu_lib/account').once('value');
-        const pr2 = admin.database().ref('/user_data/'+uid+'/library_account/ntpu_lib/password').once('value');
-        console.log("start fetching username and password from " + uid + "....")
-        var instance, _page, _url_borrow, _url_hist, _jsons = [];
-        var count = 0;
-        return Promise.all([pr1, pr2]).then(results => {
+.onCreate(event =>{
+    
+	event.data.ref.parent.child('ntpu_State').set('initialize')
+	const uid = event.params.userId;
+	const pr1 = admin.database().ref('/user_data/'+uid+'/library_account/ntpu_lib/account').once('value');
+	const pr2 = admin.database().ref('/user_data/'+uid+'/library_account/ntpu_lib/password').once('value');
+	console.log("start fetching username and password from "+uid+"....")
+	var countt = 0;
+	var instance, _page, _url_borrow, _url_hist
+	return Promise.all([pr1,pr2]).then(results =>{
+		event.data.ref.parent.child('ntpu_State').set('pending')
+		console.log("fetching success!")
+		const username = results[0].val()
+		const password = results[1].val()
+		console.log("user is "+username);
+		const pr = 
+		  phantom
+		  .create()
+		  .then(ph => {
+		    instance = ph
+		    return instance.createPage()
+		  })
+		  .then(page => {
+		  	console.log("create page success")
+		    _page = page
+		    _page.setting('userAgent', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36")
+		    _page.on('onConsoleMessage', true, function(msg) {
+		        console.log('msg: ' + msg)
+		    })
+		    return _page.open('http://webpac.library.ntpu.edu.tw/Webpac2/Person.dll/')
+		  })
+		  .then(status => {
+        return new Promise(function (resolve, reject) {
+          _page.on('onAlert', function (msg) {
+            reject(msg)
+          })
+          _page.on('onLoadFinished', function (status) {
+            resolve(status)
+          })
 
-            event.data.ref.parent.child('State').set('pending');
+          _page.evaluate(function (name,pass) {
 
-            const username = results[0].val();
-            const password = results[1].val();
+            document.querySelector("input[name='RNO']").value = name;
+            document.querySelector("input[name='PWD']").value = pass;
+            document.querySelector("form[name='CODE']").submit();
+            return new Promise(resolve => setTimeout(resolve, 5000))
 
-            console.log(username+" start login");
-            const pr = phantom.create()
-                .then(ph => {
-                    instance = ph;
-                    return instance.createPage();
-                })
-                .then(page => {
-                    _page = page;
-                    _page.setting('userAgent', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36")
-                    _page.on('onConsoleMessage', function (msg) {
-                        console.log(msg)
-                    })
-                    return _page.open('http://webpac.library.ntpu.edu.tw/Webpac2/Person.dll/');
-                })
-                .then(status => {
-                    return new Promise(function (resolve, reject) {
-                        _page.on('onAlert', function (msg) {
-                            reject(msg)
-                        })
-                        _page.on('onLoadFinished', function (status) {
-                            resolve(status)
-                        })
-                        _page.evaluate(function (name, pass) {
-                            document.querySelector("input[name='RNO']").value = name;
-                            document.querySelector("input[name='PWD']").value = pass;
-                            document.querySelector("form[name='CODE']").submit();
-                            console.log("Login submitted!");
-                        }, username, password)
-                    })
-                })
-                .then(() => {
-                	console.log( username+" is log in,start search info..");
-                    const prr = _page.sendEvent('click', 80, 150);
-                    return Promise.all([
-                    	prr,
-                        _page.off('onLoadFinished'),
-                        _page.off('onAlert'),
-                        new Promise(function (resolve) {
-                            _page.on('onResourceReceived', function (response) {
-                                if (response.stage == 'end') {
-                                    var sss = JSON.parse(JSON.stringify(response))
-                                    console.log('borrow ' + sss['url'])
-                                    _url_borrow = sss["url"]
-                                    resolve()
-                                }
-                            })
-                        })
-                    ])
-                })
-                .then((p) => {
-                    const prr = _page.sendEvent('click', 80, 166);
-                    return Promise.all([
-                    	prr,
-                        _page.off('onResourceReceived'),
-                        new Promise(function (resolve) {
-                            _page.on('onResourceReceived', function (response) {
-                                if (response.stage == 'end') {
-                                    var sss = JSON.parse(JSON.stringify(response))
-                                    console.log('history ' + sss['url'])
-                                    _url_hist = sss["url"]
-                                    resolve()
-                                }
-                            })
-                        })
-                    ])
-                })
-                .catch(err=>{
-                	console.log("")
-                })
-
-                return Promise.all([pr]).then(()=>{
-                	console.log("bor :" ,_url_borrow)
-            		console.log("hist :" ,_url_hist)
-                	console.log("end fetching url.....")
-                })
+          },username,password)
         })
-        .then(()=>{
-        	
-        	
-            var options = {
-                        uri: _url_borrow,
-                        timeout: 5000,
-                        headers: {
-                            'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
-                            "Accept-Language": "en-US,en;q=0.9",
-                            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-                            "Connection": "keep-alive"
-                        },
-                        encoding: null,
-                        json: true, // Automatically parses the JSON string in the response
-                        transform: function (body) {
-                            var bufferhelper = new BufferHelper();
-                            bufferhelper.concat(body);
-                            body = ic.decode(bufferhelper.toBuffer(), 'Big5')
-                            //console.log(body);
-                            return cheerio.load(body);
-                        }
-                    };
-
-					const pr = rp(options)
-                        .then(function ($) {
-                        	console.log("open borrow url....")
-                            var data = $('td')
-                           
-                            for (var i = 13, len = data.length; i < len; i += 9) {
-                                var renew_count = $(data[i + 6]).text().trim()
-                                var return_time = $(data[i + 5]).text().trim()
-                                var title = $(data[i + 3]).text().trim()
-                                var waiting_people_number = $(data[i + 7]).text().trim()
-                                var jsons = {
-                                    "renew_count": renew_count,
-                                    "return_time": return_time,
-                                    "title": title,
-                                    "waiting_people_number": waiting_people_number,
-                                }
-                                event.data.ref.parent.child('list').update({[count]:jsons});
-                                count++;
-                                
-                            }
-                           
-                        })
-                        .catch(function (err) {
-                            console.log(err);
-                        });
-                return Promise.all([pr]).then(()=>{
-                	console.log("end parse borrow info.")
-                })
+      })
+      .then((status)=> {
+        _page.sendEvent('keydown', 16777217, null, null)
+        _page.sendEvent('keydown', 16777217, null, null)
+        _page.sendEvent('keydown', 16777217, null, null)
+        _page.sendEvent('keydown', 16777217, null, null)
+        _page.sendEvent('keydown', 16777221, null, null)
+        return Promise.all([
+          _page.off('onAlert'),
+          new Promise(function (resolve) {
+            _page.on('onResourceReceived', function(response) {
+              if (response.stage == 'end') {
+                var sss = JSON.parse(JSON.stringify(response))
+                _url_borrow = sss["url"]
+                resolve()
+              }
+            })
+          })
+        ])
+      })
+      .then((p)=> {
+        _page.sendEvent('keydown', 16777217, null, null)
+        _page.sendEvent('keydown', 16777221, null, null)
+        return Promise.all([
+          _page.off('onResourceReceived'),
+          new Promise(function (resolve) {
+            _page.on('onResourceReceived', function(response) {
+              if (response.stage == 'end') {
+                var sss = JSON.parse(JSON.stringify(response))
+                _url_hist = sss["url"]
+                resolve()
+              }
+            })
+          })
+        ])
+      })
+      .then((p)=>{
+        return Promise.all([
+          _page.off('onResourceReceived'),
+          _page.open(_url_borrow)
+        ])
+      })
+      .then((p)=>{
+        return new Promise(resolve => setTimeout(resolve, 3000))
+      })
+      .then((p)=>{
+        return _page.property('content')
+      })
+      .then((content)=>{
+        console.log('loading list')
+        var $ = cheerio.load(content)
+    
+        var data = $('table:nth-child(3) > tbody > tr > td')
+        for (var i = 9; i < data.length; i+=9) {
+        	countt++;
+          var author = $(data[i + 4]).text().trim()
+          var location = "臺北大學圖書館 " + $(data[i + 2]).text().trim()
+          var renew_count = $(data[i + 6]).text().trim()
+          var title = $(data[i + 3]).text().trim()
+    
+          var json = {
+              "author": author,
+              "location": location,
+              "renew_count": renew_count,
+              "title": title,
+          }
+          /////////////////////////////////////////////////////
+          admin.database().ref('/user_data/'+uid+'/borrow_book/list').update({[countt]:json});
+          /////////////////////////////////////////////////////
+        }
+        return new Promise(resolve => setTimeout(resolve, 3000))
+      })
+      .then((p)=>{
+        return _page.open(_url_hist)
+      })
+      .then((p)=>{
+        return new Promise(resolve => setTimeout(resolve, 3000))
+      })
+      .then((p)=>{
+        return _page.property('content')
+      })
+      .then((content)=>{
+        console.log('loading history')
+        var $ = cheerio.load(content)
+    
+        var data = $('table:nth-child(2) > tbody > tr > td')
+        for (var i = 11; i < data.length; i+=8) {
+        	countt++;
+          var author = $(data[i + 5]).text().trim()
+          var borrow_time = $(data[i + 1]).text().trim()
+          var location = "臺北大學圖書館 " + $(data[i + 3]).text().trim()
+          var title = $(data[i + 4]).text().trim()
+          var search_book_number = $(data[i + 7]).text().trim()
+    
+          var json = {
+              "author": author,
+              "borrow_time": borrow_time,
+              "location": location,
+              "title": title,
+              "search_book_number": search_book_number
+          }
+          /////////////////////////////////////////////////////
+          admin.database().ref('/user_data/'+uid+'/borrow_book/list').update({[countt]:json});
+          /////////////////////////////////////////////////////
+        }
+        return new Promise(resolve => setTimeout(resolve, 3000))
+      })
+      .then((p)=> {
+        const off = _page.off('onLoadFinished');
+        return Promise.all([off])
+      })
+      .then(()=> {
+        event.data.ref.parent.child('ntpu_State').set('Finish')
+        instance.exit()
+      })
+      .catch(e => {
+        console.log(username+"login Failed! " + e)
+        const off = _page.off('onLoadFinished');
+        return Promise.all([off]).then(()=>{
+          event.data.ref.parent.child('ntpu_State').set('Error')
+          instance.exit()
         })
-        .then(()=>{
+      });
 
-        	var options2 = {
-                        uri: _url_hist,
-                        timeout: 5000,
-                        headers: {
-                            'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36",
-                            "Accept-Language": "en-US,en;q=0.9",
-                            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-                            "Connection": "keep-alive"
-                        },
-                        encoding: null,
-                        json: true, // Automatically parses the JSON string in the response
-                        transform: function (body) {
-                            var bufferhelper = new BufferHelper();
-                            bufferhelper.concat(body);
-                            body = ic.decode(bufferhelper.toBuffer(), 'Big5')
-                            return cheerio.load(body);
-                        }
-                    };
-            const pr2 = rp2(options2)
-                        .then(function ($) {
-                            var data = $('td')
-                            for (var i = 12, len = data.length; i < len; i += 8) {
-                                var auther = $(data[i + 5]).text().trim()
-                                var borrow_time = $(data[i + 1]).text().trim()
-                                var location = $(data[i + 3]).text().trim()
-                                var renew_count = "-"
-                                var return_time = "-/-/-"
-                                var title = $(data[i + 4]).text().trim()
-                                var waiting_people_number = "0"
-                                var search_book_number = $(data[i + 7]).text().trim()
-
-                                if (_jsons.length > 0 && _jsons[0]["title"] == title) {
-                                    renew_count = _jsons[0]["renew_count"]
-                                    return_time = _jsons[0]["return_time"]
-                                    waiting_people_number = _jsons[0]["waiting_people_number"]
-                                    _jsons.splice(0, 1)
-                                }
-
-                                var jsons = {
-                                    "auther": auther,
-                                    "borrow_time": borrow_time,
-                                    "location": location,
-                                    "renew_count": renew_count,
-                                    "return_time": return_time,
-                                    "title": title,
-                                    "waiting_people_number": waiting_people_number,
-                                    "search_book_number": search_book_number
-                                }
-                               
-                                /////////////////////////////////////////////////////
-                                event.data.ref.parent.child('list').update({[count]:jsons});
-                                count++;
-                                //console.log(jsons);
-                                /////////////////////////////////////////////////////
-                            }
-                        })
-                        .catch(function (err) {
-                            console.log(err);
-                        });
-
-                        return Promise.all([_page.off('onResourceReceived'),pr2]).then(() => {
-                        console.log("finish searching information..")
-                        event.data.ref.parent.child('trigger').remove();
-                    })
-
-        })
-
+      return Promise.all([pr]).then(()=>{
+        return event.data.ref.parent.child('trigger').remove()
+      })
     })
+})
 
 exports.ntc_list = functions.database.ref('/user_data/{userId}/borrow_book/trigger')
 .onCreate(event =>{
@@ -1524,7 +1488,7 @@ exports.ntc_list = functions.database.ref('/user_data/{userId}/borrow_book/trigg
 	const uid = event.params.userId;
 	const pr1 = admin.database().ref('/user_data/'+uid+'/library_account/ntc_lib/account').once('value');
     const pr2 = admin.database().ref('/user_data/'+uid+'/library_account/ntc_lib/password').once('value');
-    var countt = 0;
+    var countt = 40;
 	console.log("start fetching username and password from "+uid+"....")
 	var instance, _page;
 	return Promise.all([pr1,pr2]).then(results =>{
@@ -1550,49 +1514,47 @@ exports.ntc_list = functions.database.ref('/user_data/{userId}/borrow_book/trigg
 		    return _page.open('http://www.library.ntpc.gov.tw/loginControl/')
 		  })
 		  .then(status => {
-        return new Promise(function (resolve, reject) {
+        	return new Promise(function (resolve, reject) {
           var condition = 0  // 0: timeout  1: success 2: fail
-            _page.on('onUrlChanged', function (url) {
-                if (url == 'http://www.library.ntpc.gov.tw/') {
-                    condition = 1
-                    resolve()
-                }
-            })
+          _page.on('onLoadFinished', function (url) {
+            condition = 1
+            resolve()
+          })
 
-            _page.evaluate(function (name, pass) {
-                document.querySelector("input[id='loginUsername']").value = name
-                document.querySelector("input[id='loginPassword']").value = pass
-                document.querySelector("input[name='codenumber']").value = document.querySelector("input[id='codeVal']").value
-                document.querySelector("input[type='submit']").onclick();
-                console.log("Login submitted!")
-            }, username, password)
-            .then(() => {
-                var start = new Date().getTime(),
-                    interval = setInterval(function () {
-                    //  20s 超時
-                    if ((new Date().getTime() - start < 20000) && condition == 0) {
-                        console.log((new Date().getTime() - start))
-                        _page.property('content')
-                            .then((body) => {
-                                var $ = cheerio.load(body)
-                                if ($('td > #messSpan').text() != null) {
-                                    condition = 2
-                                }
-                            })
-                    } else {
-                        if (condition == 0) {
-                            reject("timeout");
-                            clearInterval(interval); //< Stop this interval
-                        } else if (condition == 1) {
-                            console.log("finished in " + (new Date().getTime() - start) + "ms.");
-                            clearInterval(interval); //< Stop this interval
-                        } else {
-                            reject("Incorrect passward!!")
-                            clearInterval(interval); //< Stop this interval
-                        }
-                    }
-                }, 500); //< repeat check every 500ms
-            })
+          _page.evaluate(function (name,pass) {
+
+            document.querySelector("input[id='loginUsername']").value = name
+            document.querySelector("input[id='loginPassword']").value = pass
+            document.querySelector("input[name='codenumber']").value = document.querySelector("input[id='codeVal']").value
+            document.querySelector("input[type='submit']").onclick()
+            return new Promise(resolve => setTimeout(resolve, 10000))
+
+          },username,password)
+          .then(() => {
+              var start = new Date().getTime(),
+                  interval = setInterval(function () {
+                  //  20s �W��
+                  if ((new Date().getTime() - start < 20000) && condition == 0) {
+                      console.log((new Date().getTime() - start))
+                      _page.property('content')
+                          .then((body) => {
+                              var $ = cheerio.load(body)
+                              if ($('td > #messSpan').length === 1 && $('td > #messSpan').text()){
+                                clearInterval(interval);
+                                reject($('td > #messSpan').text())
+                              }
+                          })
+                  } else {
+                      if (condition == 0) {
+                          reject("timeout");
+                          clearInterval(interval); //< Stop this interval
+                      } else if (condition == 1) {
+                          console.log("finished in " + (new Date().getTime() - start) + "ms.");
+                          clearInterval(interval); //< Stop this interval
+                      }
+                  }
+              }, 500); //< repeat check every 500ms
+          })
         })
       })
       .then((p)=> {
