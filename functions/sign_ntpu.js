@@ -3,8 +3,8 @@ var phantom = require('phantom')
 
 
 var instance, _page
-const username = "410485024";
-const password = "A129762071";
+const username = "<username>";
+const password = "<userpassword>";
 const pr = 
    phantom
   .create()
